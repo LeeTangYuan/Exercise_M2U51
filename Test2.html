@@ -3,177 +3,606 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keil uVision5 實作手冊：M2U51 溫控 PWM 呼吸燈系統</title>
-    <!-- Tailwind CSS for modern responsive UI styling -->
+    <title>M2U51 專案實戰：樂高積木組裝指南與硬體設計</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for hardware, IDE, and UI icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts for professional code and typography presentation -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #F8FAFC; 
         }
-        .code-font {
+        .fira-code {
             font-family: 'Fira Code', monospace;
         }
-        /* Custom scrollbars for clean code blocks */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+        /* 自定義滾動條 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #F4F5F7;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
             border-radius: 4px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+        /* 步驟切換過渡 */
+        .step-transition {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* 樂高積木拼裝動態效果 */
+        .lego-part {
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .lego-locked {
+            opacity: 0.15;
+            filter: grayscale(100%) blur(0.5px);
+            stroke-dasharray: 4, 4;
+        }
+        .lego-unlocked {
+            opacity: 1;
+            filter: grayscale(0%) blur(0px);
+            stroke-dasharray: none;
+        }
+
+        /* 樂高旋轉摩天輪動畫 */
+        @keyframes rotate-wheel {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-wheel {
+            transform-origin: 235px 125px; /* 摩天輪中心 */
+            animation: rotate-wheel var(--spin-duration, 8s) linear infinite;
+        }
+
+        /* 傳送帶物品運送 */
+        @keyframes cargo-flow {
+            0% { transform: translate(0, 0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translate(-100px, 30px); opacity: 0; }
+        }
+        .animate-cargo {
+            animation: cargo-flow 2.5s linear infinite;
+        }
+
+        /* 大腦呼吸脈衝 */
+        @keyframes pulse-brain {
+            0%, 100% { filter: drop-shadow(0 0 2px rgba(213, 38, 47, 0.3)); transform: scale(1); }
+            50% { filter: drop-shadow(0 0 12px rgba(213, 38, 47, 0.8)); transform: scale(1.05); }
+        }
+        .animate-brain {
+            transform-origin: 155px 75px;
+            animation: pulse-brain 2s infinite ease-in-out;
         }
     </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pulseRed: '#D7262F',      /* 主色：脈衝紅 */
+                        oxygenWhite: '#FFFFFF',   /* 背景色：純氧白 */
+                        logicGray: '#F4F5F7',     /* 輔助色：邏輯灰 */
+                        legoGreen: '#10b981',
+                        mcuSlate: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
+<body class="text-slate-800 min-h-screen flex flex-col">
 
-    <!-- TOP APP BAR -->
-    <header class="bg-[#0f172a] border-b border-slate-800/80 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="bg-gradient-to-tr from-amber-500 to-rose-600 p-2 rounded-xl text-white shadow-md shadow-rose-500/20">
-                <i class="fa-solid fa-wind text-xl animate-pulse"></i>
+    <!-- 頂部導航欄 (純氧白基礎) -->
+    <header class="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-40 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-pulseRed p-2.5 rounded-xl shadow-lg shadow-red-500/10 flex items-center justify-center">
+                    <i class="fa-solid fa-cubes text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        M2U51 減量增量實戰
+                        <span class="text-xs bg-red-50 text-pulseRed border border-red-200 px-2 py-0.5 rounded-full font-semibold">樂高積木組裝指南</span>
+                    </h1>
+                    <p class="text-xs text-slate-500">動態組裝概念視覺化與完整專案開發實踐</p>
+                </div>
             </div>
-            <div>
-                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                    Nuvoton M2U51 <span class="text-xs bg-slate-800 text-amber-400 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">I2C + Timer PWM 實作</span>
-                </h1>
-                <p class="text-xs text-slate-400">實驗：讀取 NCT7712Y 溫度並依據 &gt; 27°C 閥值調整 LED 呼吸頻率</p>
+            <!-- 組裝總進度指示 -->
+            <div class="flex items-center gap-4 bg-logicGray p-2.5 rounded-xl border border-slate-200 text-xs">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-screwdriver-wrench text-slate-500"></i>
+                    <span class="text-slate-500">拼裝進度:</span>
+                    <span id="progress-percent-badge" class="font-bold text-pulseRed fira-code">0%</span>
+                </div>
+                <div class="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div id="progress-bar-badge" class="bg-pulseRed h-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+                <div class="w-px h-4 bg-slate-200"></div>
+                <div class="flex items-center gap-1.5 text-slate-600 font-semibold">
+                    <span id="unlocked-count">0</span> / 5 部件已就位
+                </div>
             </div>
-        </div>
-        
-        <!-- Interactive Progress Map -->
-        <div class="flex items-center gap-4 bg-[#05070c] px-4 py-2 rounded-xl border border-slate-800/80">
-            <div class="text-xs font-semibold text-slate-400">實作步驟進度</div>
-            <div class="w-32 bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div id="progressBar" class="bg-gradient-to-r from-amber-500 to-rose-500 h-full transition-all duration-500 w-[20%]"></div>
-            </div>
-            <span id="progressText" class="text-xs font-bold text-amber-400 font-mono">1 / 5</span>
         </div>
     </header>
 
-    <!-- MAIN WORKSPACE -->
-    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 max-w-[1850px] w-full mx-auto">
+    <!-- 雙欄排版 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- LEFT PANEL: STEPS NAVIGATION & PEDAGOGY (5 Columns) -->
-        <section class="xl:col-span-5 flex flex-col gap-6 bg-[#0f172a]/90 border border-slate-800/80 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
-            
-            <!-- Step List Indicator (Quick Jumps) -->
-            <div class="bg-[#05070c] p-3 rounded-xl border border-slate-800/60">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">步驟選單</div>
-                <div class="grid grid-cols-5 gap-1.5" id="stepIndicatorContainer">
-                    <!-- Javascript will inject quick jump buttons here -->
-                </div>
+        <!-- 左欄：教學指南與程式碼 (純氧白卡片) -->
+        <section class="lg:col-span-7 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <!-- 步進器進度導航 -->
+            <div class="bg-logicGray border-b border-slate-200 p-4 overflow-x-auto">
+                <ul class="flex justify-between items-center relative min-w-[500px] px-2">
+                    <!-- 進度背景線 -->
+                    <div class="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
+                    <!-- 活躍進度線（脈衝紅） -->
+                    <div id="step-progress-line" class="absolute top-1/2 left-0 h-1 bg-pulseRed -translate-y-1/2 z-0 transition-all duration-300" style="width: 0%;"></div>
+
+                    <!-- 步驟 0 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(0)">
+                        <div id="step-num-0" class="w-9 h-9 rounded-full bg-pulseRed text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all shadow-lg shadow-red-500/30 scale-110">0</div>
+                        <span class="text-[10px] mt-1 font-semibold text-pulseRed block">0.專案簡介</span>
+                    </li>
+                    <!-- 步驟 1 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(1)">
+                        <div id="step-num-1" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">1</div>
+                        <span class="text-[10px] mt-1 font-semibold text-slate-500 block">1.大底板</span>
+                    </li>
+                    <!-- 步驟 2 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(2)">
+                        <div id="step-num-2" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">2</div>
+                        <span class="text-[10px] mt-1 font-semibold text-slate-500 block">2.透視鏡</span>
+                    </li>
+                    <!-- 步驟 3 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(3)">
+                        <div id="step-num-3" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">3</div>
+                        <span class="text-[10px] mt-1 font-semibold text-slate-500 block">3.摩天輪</span>
+                    </li>
+                    <!-- 步驟 4 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(4)">
+                        <div id="step-num-4" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">4</div>
+                        <span class="text-[10px] mt-1 font-semibold text-slate-500 block">4.傳送帶</span>
+                    </li>
+                    <!-- 步驟 5 -->
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(5)">
+                        <div id="step-num-5" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">5</div>
+                        <span class="text-[10px] mt-1 font-semibold text-slate-500 block">5.智慧大腦</span>
+                    </li>
+                </ul>
             </div>
 
-            <!-- Dynamic Pedagogy Block -->
-            <div class="flex-1 flex flex-col justify-between min-h-[350px]">
-                <div class="space-y-4">
-                    <!-- Step Badge and Classification -->
-                    <div class="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider text-xs">
-                        <span class="bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-md" id="stepBadge">步驟 1 / 5</span>
-                        <span id="stepCategory" class="text-slate-400">專案宣告與全域常數</span>
+            <!-- 教學內文與程式碼切換 -->
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+                
+                <!-- 步驟文字內容 -->
+                <div>
+                    <!-- 步驟 0: 專案簡介 (新增) -->
+                    <div id="step-content-0" class="step-transition">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-red-50 text-pulseRed rounded-full border border-red-200">📋 專案導言</span>
+                            <span class="text-xs text-slate-500">M2U51 MCU 訓練實作藍圖</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3">
+                            M2U51 智慧溫控呼吸城堡
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm mb-5">
+                            這個專案是 M2U51 MCU 訓練課程的實作範例，結合兩個核心功能：<strong class="text-pulseRed">I2C 溫度感測</strong> 與 <strong class="text-pulseRed">PWM 呼吸燈</strong>，並依據溫度自動調整呼吸速度。系統在非資料搬移期間將大腦關閉進入極低功耗模式，實現高效率、零等待的綠色嵌入式設計。
+                        </p>
+
+                        <!-- 功能項目表 -->
+                        <div class="mb-5">
+                            <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1">
+                                <i class="fa-solid fa-star text-pulseRed"></i> 專案核心功能
+                            </h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-logicGray border-b border-slate-200 text-slate-700 font-bold">
+                                            <th class="p-3 w-1/4">功能</th>
+                                            <th class="p-3">項目說明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-slate-600">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">溫度量測</td>
+                                            <td class="p-3">透過 I2C0 每秒自動讀取 NCT7712Y 溫度感測器（位址 0x48）</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">呼吸燈</td>
+                                            <td class="p-3">Timer0 PWM 驅動 PB5 上的 LED，佔空比在 20% ↔ 100% 間循環變化</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">溫度連動</td>
+                                            <td class="p-3">溫度 &gt; 27°C → 呼吸加快（350ms/週期）；≤ 27°C → 呼吸放慢（4.2s/週期）</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">省電設計</td>
+                                            <td class="p-3">等待期間進入 NPD1 深度省電，CPU 使用率 &lt; 0.1%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 使用的周邊表 -->
+                        <div class="mb-5">
+                            <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1">
+                                <i class="fa-solid fa-microchip text-pulseRed"></i> 晶片硬體周邊配置
+                            </h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-logicGray border-b border-slate-200 text-slate-700 font-bold">
+                                            <th class="p-3 w-1/4">周邊</th>
+                                            <th class="p-3">用途</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-slate-600">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">Timer1 (LIRC)</td>
+                                            <td class="p-3">1Hz 週期觸發 I2C Auto-Operation</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">Timer0 (LIRC)</td>
+                                            <td class="p-3">100Hz PWM 輸出 + 累加器中斷更新佔空比（呼吸燈）</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">I2C0</td>
+                                            <td class="p-3">Master Auto-Operation 模式，自動執行 Random Read</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">PDMA0</td>
+                                            <td class="p-3">CH0 = I2C TX、CH1 = I2C RX（scatter-gather），全程不需 CPU 介入</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">UART0</td>
+                                            <td class="p-3">115200 baud 印出溫度與狀態訊息</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 設計特點清單 -->
+                        <div class="bg-logicGray rounded-xl p-4 border border-slate-200 space-y-3">
+                            <h4 class="text-xs font-bold text-pulseRed uppercase tracking-wider">💡 頂級硬體整合特點</h4>
+                            <ul class="space-y-2 text-xs text-slate-600">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">全自動 I2C 讀取：</strong> Timer1 觸發 → I2C Auto-Op 硬體執行匯流排時序 → PDMA 搬運資料 → 完成後中斷喚醒 CPU，期間大腦全程沉睡。</div>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">ISR 軟體除頻呼吸燈：</strong> Timer0 PWM 硬體輸出波形在 NPD1 狀態下不中斷，ISR 每 10ms 喚醒 CPU 更新佔空比，速度切換只改一個變數（<code>g_u32BreathDiv</code>），不需停止或重啟計時器。</div>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">NPD1 節能閉迴路：</strong> 高頻時脈 HIRC 關閉，僅靠 LIRC 維持計時器運行。UART 傳輸完全清空後再進休眠避免字元亂碼，喚醒後等待 HIRC 穩定再執行傳送。</div>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-                    
-                    <h2 id="stepTitle" class="text-2xl font-extrabold text-white tracking-tight">
-                        全域架構與常數宣告
-                    </h2>
-                    
-                    <!-- Scrollable Pedagogy Steps Content -->
-                    <div id="stepContent" class="space-y-4 text-slate-300 text-sm leading-relaxed overflow-y-auto max-h-[48vh] pr-2">
-                        <!-- Content injected via JavaScript -->
+
+                    <!-- 步驟 1: SYS_Init -->
+                    <div id="step-content-1" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200">🧱 樂高積木地基 1</span>
+                            <span class="text-xs text-slate-500">時脈暫存器系統初始化</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            鋪設城堡的「綠色大底板」 <span class="text-pulseRed font-mono text-lg font-normal">(SYS_Init)</span>
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm">
+                            組裝樂高的第一步，必須先拿出一塊綠色基礎大底板。這塊底板規定了整座城堡的電源動力配線與外部接口。我們將開啟內部高速時鐘（HIRC）給 CPU 以及低速時鐘（LIRC）給 Timer 模組，並分配引腳功能。
+                        </p>
+                    </div>
+
+                    <!-- 步驟 2: UART0_Init -->
+                    <div id="step-content-2" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-red-50 text-pulseRed rounded-full border border-red-200">🧱 樂高積木組件 2</span>
+                            <span class="text-xs text-slate-500">UART0 除錯通訊配置</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            插上「除錯透視鏡積木」 <span class="text-pulseRed font-mono text-lg font-normal">(UART0_Init)</span>
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm">
+                            在底板上插上一組藍芽發射鏡（UART0）。只要城堡內部有一絲一毫動靜，立刻將溫度數據與系統事件透過 TX 腳位（PB13）發射到電腦顯示器上。此步驟排除 RX 接收引腳以防止掉電漏電。
+                        </p>
+                    </div>
+
+                    <!-- 步驟 3: Timer0 PWM -->
+                    <div id="step-content-3" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-600 rounded-full border border-amber-200">🧱 樂高積木組件 3</span>
+                            <span class="text-xs text-slate-500">Timer0 PWM 呼吸燈組件</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            組裝自主旋轉的「摩天輪」 <span class="text-pulseRed font-mono text-lg font-normal">(Timer0 PWM)</span>
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm">
+                            利用獨立的 Timer0 驅動 PB5 腳位輸出 PWM 訊號，產生平滑呼吸忽明忽暗的效果。這個呼吸摩天輪直接掛載在藍色不斷電線（LIRC 38.4kHz）上，不耗費大腦（CPU）任何多餘的運作電力。
+                        </p>
+                    </div>
+
+                    <!-- 步驟 4: I2C + PDMA -->
+                    <div id="step-content-4" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">🧱 樂高積木組件 4</span>
+                            <span class="text-xs text-slate-500">PDMA Scatter-Gather I2C 搬運</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            架設全自動的「工廠傳送帶」 <span class="text-pulseRed font-mono text-lg font-normal">(I2C + PDMA)</span>
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm">
+                            組裝由 5 個鏈結描述符（Descriptors）構成的雙向 PDMA 自動傳送帶，定時（Timer1 1Hz）自動向溫感晶片讀取資料。前 4 張任務卡自動搬運，第 5 張基礎卡（BASIC Mode）搬運後拉響大腦警報（PDMA_DONE）。
+                        </p>
+                    </div>
+
+                    <!-- 步驟 5: Power Down Loop -->
+                    <div id="step-content-5" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-slate-100 text-slate-700 rounded-full border border-slate-200">🧱 樂高智慧大腦 5</span>
+                            <span class="text-xs text-slate-500">NPD1 省電整合閉迴路</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            城堡通電！啟動「大腦節能迴圈」 <span class="text-pulseRed font-mono text-lg font-normal">(NPD1 Power-Down)</span>
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm">
+                            將所有硬體模組結合！大腦在傳送命令後立刻呼叫 <code>PowerDown()</code> 沉睡，傳送帶與摩天輪依靠 LIRC 自主運行。每當傳送帶完成搬運拉響警報，大腦驚醒讀取溫度：若大於 27°C 則將摩天輪速度撥快，隨後再度躺下睡覺。
+                        </p>
                     </div>
                 </div>
 
-                <!-- NAVIGATION ACTIONS AND UTILITIES -->
-                <div class="mt-6 pt-5 border-t border-slate-800/60 flex items-center justify-between gap-4 shrink-0">
-                    <button id="prevBtn" class="px-4 py-2.5 bg-slate-850 hover:bg-slate-800 text-slate-300 rounded-xl hover:text-white border border-slate-800 transition duration-200 text-xs font-semibold flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed">
-                        <i class="fa-solid fa-chevron-left"></i> 上一步
-                    </button>
-                    
-                    <button id="nextBtn" class="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white rounded-xl shadow-lg shadow-rose-500/20 transition duration-200 text-xs font-semibold flex items-center gap-2">
-                        下一步 <i class="fa-solid fa-chevron-right"></i>
-                    </button>
+                <!-- 程式碼視窗區 (切換控制) -->
+                <div class="bg-logicGray rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
+                    <!-- Tab 切換列 -->
+                    <div class="border-b border-slate-200 px-4 py-2 bg-slate-50 flex flex-wrap justify-between items-center gap-2">
+                        <div class="flex gap-2">
+                            <button id="tab-btn-step" onclick="switchCodeTab('step')" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-800 shadow-sm transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-code text-pulseRed"></i> 當前步驟核心程式
+                            </button>
+                            <button id="tab-btn-full" onclick="switchCodeTab('full')" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-file-lines"></i> 完整專案 main.c 內容
+                            </button>
+                        </div>
+                        
+                        <!-- 搜尋框（僅在完整 main.c 時出現） -->
+                        <div id="search-container" class="hidden relative">
+                            <input id="code-search-input" type="text" placeholder="搜尋 main.c 內容..." oninput="searchInCode()" class="pl-7 pr-3 py-1 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-pulseRed focus:border-pulseRed w-44">
+                            <i class="fa-solid fa-search text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px]"></i>
+                        </div>
+                    </div>
+
+                    <!-- 當前步驟代碼盒 -->
+                    <div id="code-container-step" class="relative group">
+                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="copyCode('step-code-content')" class="bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 px-2 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                <i class="fa-regular fa-copy"></i> 複製
+                            </button>
+                        </div>
+                        <pre class="bg-slate-900 p-4 overflow-x-auto text-xs text-emerald-400 fira-code max-h-[320px] custom-scrollbar"><code id="step-code-content">// 核心程式載入中...</code></pre>
+                    </div>
+
+                    <!-- 完整專案 main.c 內容盒 -->
+                    <div id="code-container-full" class="hidden flex flex-col bg-slate-900 overflow-hidden max-h-[380px]">
+                        <div class="flex-1 overflow-y-auto custom-scrollbar flex">
+                            <!-- 行號列 -->
+                            <div id="line-numbers" class="p-4 pr-2 text-right select-none text-slate-600 font-mono text-[11px] border-r border-slate-800 bg-slate-950/40 min-w-[3.5rem] fira-code">
+                                <!-- JS 動態填充 -->
+                            </div>
+                            <!-- 程式碼內容 -->
+                            <pre class="p-4 flex-1 overflow-x-auto text-[11px] text-slate-300 fira-code"><code id="full-code-content" class="block whitespace-pre"></code></pre>
+                        </div>
+                    </div>
                 </div>
+
+            </div>
+
+            <!-- 底端導航按鈕 -->
+            <div class="bg-logicGray border-t border-slate-200 p-4 flex justify-between items-center">
+                <button id="prevBtn" onclick="changeStep(-1)" class="px-5 py-2 rounded-xl text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-sm">
+                    <i class="fa-solid fa-arrow-left"></i> 上一步
+                </button>
+                <button id="nextBtn" onclick="changeStep(1)" class="px-6 py-2 rounded-xl text-white bg-pulseRed hover:bg-red-700 shadow-lg shadow-red-500/10 text-sm font-semibold flex items-center gap-2 transition-all">
+                    下一步 <i class="fa-solid fa-arrow-right"></i>
+                </button>
             </div>
         </section>
 
-        <!-- RIGHT PANEL: INTERACTIVE CODE VIEWER (7 Columns) -->
-        <section class="xl:col-span-7 flex flex-col gap-4 bg-[#0a0f1d] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            
-            <!-- Code Tab / Header bar -->
-            <div class="bg-[#0f172a] px-5 py-3 flex items-center justify-between border-b border-slate-800/80 shrink-0 text-xs">
-                <div class="flex items-center gap-3">
-                    <span class="flex items-center gap-1.5 text-slate-300 font-mono font-semibold">
-                        <i class="fa-regular fa-file-code text-rose-400 text-sm"></i>
-                        <span id="codeFileName">main.c (步驟 1 程式片段)</span>
-                    </span>
-                    <span class="text-slate-600">|</span>
-                    <!-- Code view mode selectors -->
-                    <div class="flex items-center gap-1 bg-[#05070c] p-0.5 rounded-lg border border-slate-800">
-                        <button id="modeStepBtn" class="px-2.5 py-1 rounded bg-slate-800 text-amber-400 font-semibold transition text-[10px]">
-                            此步驟代碼
-                        </button>
-                        <button id="modeFullBtn" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 transition text-[10px]">
-                            完整 main.c 專案
+        <!-- 右欄：樂高積木組裝藍圖進度 (純氧白主體) -->
+        <section class="lg:col-span-5 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <!-- 藍圖頂部 -->
+            <div class="bg-logicGray p-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-cubes text-pulseRed"></i> 樂高實體積木組裝藍圖
+                </h3>
+                <span class="text-[10px] bg-red-50 text-pulseRed px-2.5 py-0.5 rounded-full border border-red-200 font-bold uppercase tracking-wider">Lego Blueprint</span>
+            </div>
+
+            <!-- 樂高大畫布 -->
+            <div class="p-6 flex-1 flex flex-col gap-6 justify-between items-center">
+                
+                <!-- 樂高積木組裝展示 SVG 區域 -->
+                <div class="w-full bg-logicGray rounded-2xl border border-slate-200 p-4 flex flex-col items-center justify-center relative min-h-[300px]">
+                    <div class="absolute top-2.5 left-2.5 text-[10px] text-slate-400 font-bold tracking-wider uppercase">即時組裝狀態與拓撲圖</div>
+                    
+                    <!-- 互動狀態小圖章 -->
+                    <div class="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/80 backdrop-blur px-2 py-0.5 rounded border border-slate-200 text-[10px]">
+                        <span id="lego-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <span id="lego-status-txt" class="font-bold text-slate-500">規劃中</span>
+                    </div>
+
+                    <!-- SVG 樂高積木組裝進度主體 -->
+                    <svg class="w-full max-w-[360px] h-auto drop-shadow-md" viewBox="0 0 320 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Step 1: 綠色大底板 (2.5D 基礎網格與樂高顆粒) -->
+                        <g id="lego-plate" class="lego-part lego-locked">
+                            <!-- 樂高底板底座 -->
+                            <polygon points="20,200 160,250 300,200 160,150" fill="#10B981" stroke="#059669" stroke-width="2"/>
+                            <!-- 底座厚度面 -->
+                            <polygon points="20,200 20,208 160,258 160,250" fill="#047857"/>
+                            <polygon points="300,200 300,208 160,258 160,250" fill="#065F46"/>
+                            <!-- 樂高凸點圓形矩陣 (Lego Studs) -->
+                            <ellipse cx="60" cy="188" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="110" cy="205" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="160" cy="223" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="210" cy="205" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="260" cy="188" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            
+                            <ellipse cx="110" cy="177" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="160" cy="195" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <ellipse cx="210" cy="177" rx="8" ry="4" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            <text x="160" y="243" fill="#064E3B" font-size="8" text-anchor="middle" font-weight="bold" class="fira-code">SYS_Init Baseplate</text>
+                        </g>
+
+                        <!-- Step 2: 除錯透視鏡 (藍色半透明放大鏡，裝設在底板左下方) -->
+                        <g id="lego-uart" class="lego-part lego-locked">
+                            <!-- 透鏡支架 -->
+                            <line x1="50" y1="180" x2="70" y2="150" stroke="#0284C7" stroke-width="4"/>
+                            <!-- 透視鏡環 -->
+                            <circle cx="78" cy="140" r="15" fill="#E0F2FE" fill-opacity="0.6" stroke="#0284C7" stroke-width="2.5"/>
+                            <!-- 透鏡內部十字光標 -->
+                            <line x1="70" y1="140" x2="86" y2="140" stroke="#38BDF8" stroke-width="1.5"/>
+                            <line x1="78" y1="132" x2="78" y2="148" stroke="#38BDF8" stroke-width="1.5"/>
+                            <text x="80" y="118" fill="#0369A1" font-size="8" text-anchor="middle" font-weight="bold">UART0 TX</text>
+                        </g>
+
+                        <!-- Step 3: 自動旋轉摩天輪 (在底板右方，連接計時器 PWM 訊號) -->
+                        <g id="lego-wheel" class="lego-part lego-locked">
+                            <!-- 摩天輪架子 -->
+                            <line x1="235" y1="200" x2="235" y2="125" stroke="#F59E0B" stroke-width="4"/>
+                            <line x1="215" y1="200" x2="235" y2="125" stroke="#F59E0B" stroke-width="3"/>
+                            <line x1="255" y1="200" x2="235" y2="125" stroke="#F59E0B" stroke-width="3"/>
+                            
+                            <!-- 可旋轉摩天輪組件 -->
+                            <g id="lego-spinning-wheel" class="">
+                                <!-- 內外圈輪廓 -->
+                                <circle cx="235" cy="125" r="30" stroke="#D97706" stroke-width="2" fill="none"/>
+                                <circle cx="235" cy="125" r="10" fill="#FBBF24"/>
+                                <!-- 支柱/輪輻 -->
+                                <line x1="235" y1="95" x2="235" y2="155" stroke="#D97706" stroke-width="1.5"/>
+                                <line x1="205" y1="125" x2="265" y2="125" stroke="#D97706" stroke-width="1.5"/>
+                                <!-- 呼吸 LED 掛件 (紅色的圓扣) -->
+                                <circle cx="235" cy="95" r="5" fill="#D7262F" stroke="#B91C1C" stroke-width="1" id="wheel-led-1"/>
+                                <circle cx="235" cy="155" r="5" fill="#D7262F" stroke="#B91C1C" stroke-width="1" id="wheel-led-2"/>
+                                <circle cx="205" cy="125" r="5" fill="#D7262F" stroke="#B91C1C" stroke-width="1" id="wheel-led-3"/>
+                                <circle cx="265" cy="125" r="5" fill="#D7262F" stroke="#B91C1C" stroke-width="1" id="wheel-led-4"/>
+                            </g>
+                            <text x="235" y="80" fill="#92400E" font-size="8" text-anchor="middle" font-weight="bold">Timer0 PWM LED</text>
+                        </g>
+
+                        <!-- Step 4: 工廠自動傳送帶 (連接溫控感測晶片與中樞) -->
+                        <g id="lego-conveyor" class="lego-part lego-locked">
+                            <!-- 溫控晶片端點 (外部材料倉庫) -->
+                            <rect x="230" y="32" width="45" height="25" rx="3" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+                            <text x="252.5" y="47" fill="#B45309" font-size="7" font-weight="bold" text-anchor="middle">NCT7712Y</text>
+                            
+                            <!-- 傳送軌道 -->
+                            <line x1="225" y1="45" x2="185" y2="60" stroke="#64748B" stroke-width="6"/>
+                            <line x1="225" y1="46" x2="185" y2="61" stroke="#334155" stroke-width="2"/>
+                            
+                            <!-- 傳送帶上的資料箱 (正在流動) -->
+                            <g id="conveyor-cargo" class="">
+                                <rect x="195" y="44" width="10" height="10" rx="1" fill="#D7262F" />
+                                <text x="200" y="52" fill="#fff" font-size="6" text-anchor="middle">T</text>
+                            </g>
+                            <text x="210" y="22" fill="#475569" font-size="8" text-anchor="middle" font-weight="bold">I2C PDMA Belt</text>
+                        </g>
+
+                        <!-- Step 5: 城堡控制智慧大腦 (紅色核心控制塊) -->
+                        <g id="lego-brain" class="lego-part lego-locked">
+                            <!-- 控制器核心實體 -->
+                            <polygon points="120,60 160,80 200,60 160,40" fill="#D7262F" stroke="#991B1B" stroke-width="2.5"/>
+                            <polygon points="120,60 120,80 160,100 160,80" fill="#B91C1C"/>
+                            <polygon points="200,60 200,80 160,100 160,80" fill="#991B1B"/>
+                            
+                            <!-- 腦內核心發光二極體與連接電路 -->
+                            <circle cx="160" cy="70" r="6" fill="#FFFFFF" class="animate-pulse"/>
+                            <path d="M160,100 L160,150" stroke="#D7262F" stroke-width="2" stroke-dasharray="3, 3"/>
+                            <text x="160" y="112" fill="#991B1B" font-size="8" text-anchor="middle" font-weight="bold">CPU Core (NPD1)</text>
+                        </g>
+                    </svg>
+
+                    <!-- 當前步驟組裝說明 -->
+                    <div id="assembly-legend" class="mt-4 w-full bg-white border border-slate-200 p-3 rounded-xl text-xs space-y-1">
+                        <div class="flex items-center gap-1.5 font-bold text-slate-800">
+                            <i class="fa-solid fa-circle-info text-pulseRed"></i> 當前組裝狀態：
+                        </div>
+                        <p id="assembly-desc" class="text-slate-500 leading-relaxed">
+                            專案簡介規劃中。請跟隨左側規格書，點選「下一步」開始組裝綠色底板。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 互動控制操作盒 -->
+                <div class="w-full space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">🛠️ 藍圖互動與功能驗證</h4>
+                        <span id="cycle-trigger-tip" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200 font-medium hidden">需解鎖步驟 5 啟動</span>
+                    </div>
+
+                    <!-- 城堡終極模擬驗證器 -->
+                    <div class="bg-logicGray p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-thermometer text-pulseRed"></i> 城堡周邊溫度調控：
+                            </span>
+                            <span id="temp-display-right" class="font-bold text-pulseRed fira-code">25.0 °C</span>
+                        </div>
+                        <!-- 溫度控制桿 -->
+                        <input id="lego-temp-slider" type="range" min="15.0" max="40.0" step="0.5" value="25.0" oninput="updateLegoTemp(this.value)" disabled class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400">
+                        
+                        <!-- 動態動作按鈕 -->
+                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-not-allowed shadow-inner">
+                            <i class="fa-solid fa-play"></i> 點擊啟動城堡系統閉迴路
                         </button>
                     </div>
                 </div>
-                
-                <!-- Clipboard Copy Action -->
-                <button id="copyCodeBtn" class="bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white px-3.5 py-1.5 rounded-xl border border-rose-500/25 flex items-center gap-1.5 transition text-xs font-semibold" title="複製此區塊代碼">
-                    <i class="fa-solid fa-clone"></i> <span>複製此步驟程式碼</span>
-                </button>
-            </div>
 
-            <!-- Enhanced Syntax-Highlighted Code Editor Display -->
-            <div class="flex-1 flex overflow-hidden relative">
-                <!-- Line Numbers column -->
-                <div id="lineNumbers" class="bg-[#070b14] text-right pr-3 pl-4 py-4 select-none text-slate-600 border-r border-slate-800/60 text-xs font-mono leading-6">
-                    <!-- Line numbers injected here -->
-                </div>
-                
-                <!-- Display Container -->
-                <div class="flex-1 overflow-auto bg-[#070b14]/40 p-4">
-                    <pre class="m-0"><code id="codeDisplay" class="block text-slate-200 text-xs font-mono leading-6 whitespace-pre"></code></pre>
-                </div>
-            </div>
-            
-            <!-- Code view notes footer -->
-            <div class="bg-[#0f172a] px-5 py-2.5 border-t border-slate-800/80 text-[10px] text-slate-500 flex items-center justify-between">
-                <span>編譯器相容於 Keil ARM CC 及 Nuvoton NuMicro® 開發套件規範</span>
-                <span class="flex items-center gap-1 font-mono text-amber-500/80">
-                    <i class="fa-solid fa-code"></i> UTF-8 / CR-LF
-                </span>
             </div>
         </section>
 
     </main>
 
-    <!-- TOAST NOTIFICATION FOR COPY FEEDBACK -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-emerald-500 text-emerald-400 px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-sm font-semibold transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none z-50">
-        <i class="fa-solid fa-circle-check text-base"></i>
-        <span id="toastMsg">成功複製程式碼！</span>
+    <!-- 精美無警示框完成燈箱 (脈衝紅主題) -->
+    <div id="celebrate-modal" class="fixed inset-0 bg-slate-950/40 backdrop-blur flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 text-center space-y-6 shadow-2xl scale-95 transition-all" id="celebrate-box">
+            <div class="w-20 h-20 bg-red-50 border-2 border-pulseRed rounded-full flex items-center justify-center mx-auto animate-bounce">
+                <i class="fa-solid fa-trophy text-pulseRed text-3xl"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-2xl font-bold text-slate-950">🎉 恭喜完成樂高智慧城堡！</h3>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    您已成功地將底板、除錯鏡、PWM呼吸燈、自動傳送帶（PDMA I2C）以及極低功耗 Power-Down 節能核心全部組裝完畢！
+                </p>
+            </div>
+            <div class="bg-logicGray p-4 rounded-xl border border-slate-200 text-left space-y-2 text-xs text-slate-600 fira-code">
+                <div class="flex items-center gap-1.5 text-pulseRed font-bold">
+                    <i class="fa-solid fa-circle-check"></i> 實戰組裝總清單 (main.c)
+                </div>
+                <div>• HCLK Source: HIRC (48MHz)</div>
+                <div>• Timer0 Base: LIRC (38.4kHz)</div>
+                <div>• DMA Config: 5-Descs Loop Chain</div>
+                <div>• Smart PowerDown Enabled: Wake Up & Sleep</div>
+            </div>
+            <button onclick="closeModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-pulseRed to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold text-sm shadow-lg shadow-red-500/20 transition-all">
+                返回檢視指南
+            </button>
+        </div>
     </div>
 
-    <!-- FOOTER LICENSE AND INFO -->
-    <footer class="bg-[#05070c] border-t border-slate-900 px-6 py-4 text-center text-xs text-slate-500 shrink-0">
-        Nuvoton NuMicro® M2U51 韌體學習實驗平台 © 2026 | I2C + Timer PWM 呼吸燈溫控專案
+    <!-- 頁尾 -->
+    <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-slate-400 text-xs mt-auto">
+        &copy; 2026 樂高嵌入式專案實戰指南. All rights reserved. Premium Custom LEGO Theme Framework.
     </footer>
 
-    <!-- INTERACTIVE TUTORIAL CORE LOGIC -->
-    <script>
-        // FULL INTEGRATED MAIN.C SOURCE CODE (Cleaned of Non-breaking spaces for Keil compatibility)
-        const rawFullSourceCode = `/**************************************************************************//**
+    <!-- 完整 main.c 程式儲存，供 JavaScript 動態讀取與檢索 -->
+    <script id="full-main-code" type="text/plain">/**************************************************************************//**
  * @file     main.c
  * @version  V1.00
  * @brief    I2C temperature reading from NCT7712Y + Timer PWM LED breathing.
@@ -183,7 +612,6 @@
  * @copyright (C) 2024 Nuvoton Technology Corp. All rights reserved.
  *****************************************************************************/
 #include <stdio.h>
-#include <string.h>
 #include "NuMicro.h"
 #include "Common.h"
 
@@ -204,7 +632,6 @@ typedef struct dma_desc_t
 /* I2C PDMA channels */
 #define I2C0_PDMA_TX_CH    0
 #define I2C0_PDMA_RX_CH    1
-#define PWM_PDMA_CH        2
 
 /* I2C scatter-gather parameters */
 #define SG_TX_TAB_NUM      1
@@ -225,7 +652,6 @@ uint32_t SrcArray_PWM[PWM_PDMA_LENGTH];
 
 DMA_DESC_T DMA_DESC_SC_TX[SG_TX_TAB_NUM];
 DMA_DESC_T DMA_DESC_SC_RX[SG_RX_TAB_NUM];
-DMA_DESC_T DMA_DESC_PWM[1];                        /* PWM scatter-gather descriptor (single, circular) */
 
 typedef void (*I2C_FUNC)(uint32_t u32Status);
 volatile static I2C_FUNC s_I2C0HandlerFn = NULL;
@@ -243,7 +669,7 @@ volatile uint32_t g_u32BreathCnt = 0;
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: Build_Tx_SCTab                                                                                */
-/* Purpose : Build scatter-gather descriptor table for I2C0 TX PDMA channel                                */
+/* Purpose : Build scatter-gather descriptor table for I2C0 TX PDMA channel                              */
 /*---------------------------------------------------------------------------------------------------------*/
 void Build_Tx_SCTab(uint32_t u32TabNum, uint32_t u32TxSize, uint32_t u32StartAddr)
 {
@@ -266,7 +692,7 @@ void Build_Tx_SCTab(uint32_t u32TabNum, uint32_t u32TxSize, uint32_t u32StartAdd
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: Build_Rx_SCTab                                                                                */
-/* Purpose : Build scatter-gather descriptor table for I2C0 RX PDMA channel; last entry uses basic mode    */
+/* Purpose : Build scatter-gather descriptor table for I2C0 RX PDMA channel; last entry uses basic mode  */
 /*---------------------------------------------------------------------------------------------------------*/
 void Build_Rx_SCTab(uint32_t u32TabNum, uint32_t u32RxSize, uint32_t u32StartAddr)
 {
@@ -315,7 +741,7 @@ void I2C0_IRQHandler(void)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: I2C_PDMA_MasterRx                                                                             */
-/* Purpose : I2C0 PDMA Master Rx callback; handles bus states during auto-operation random read            */
+/* Purpose : I2C0 PDMA Master Rx callback; handles bus states during auto-operation random read           */
 /*---------------------------------------------------------------------------------------------------------*/
 void I2C_PDMA_MasterRx(uint32_t u32Status)
 {
@@ -353,7 +779,7 @@ void I2C_PDMA_MasterRx(uint32_t u32Status)
     }
     else
     {
-        printf("Status 0x%x is NOT processed\\n", u32Status);
+        printf("Status 0x%x is NOT processed\n", u32Status);
     }
 }
 
@@ -370,12 +796,6 @@ void PDMA0_IRQHandler(void)
         PDMA0->TDSTS = 0x1 << I2C0_PDMA_RX_CH;
         PDMA_DONE = 1;
     }
-
-    /* PWM PDMA channel done - just clear flag */
-    if (u32Status & (0x1 << PWM_PDMA_CH))
-    {
-        PDMA0->TDSTS = 0x1 << PWM_PDMA_CH;
-    }
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -383,6 +803,9 @@ void PDMA0_IRQHandler(void)
 /*---------------------------------------------------------------------------------------------------------*/
 void TMR0_IRQHandler(void)
 {
+    /* Clear wakeup flag (needed when waking from NPD1) */
+    TPWM_ClearWakeupFlag(TIMER0);
+
     if (TIMER0->PWMAINTSTS & TIMER_PWMAINTSTS_IFAIF_Msk)
     {
         /* Clear accumulator interrupt flag */
@@ -399,7 +822,7 @@ void TMR0_IRQHandler(void)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: I2C_Init                                                                                      */
-/* Purpose : Open I2C0 at 100kHz and enable I2C0 interrupt                                                 */
+/* Purpose : Open I2C0 at 100kHz and enable I2C0 interrupt                                                */
 /*---------------------------------------------------------------------------------------------------------*/
 void I2C_Init(void)
 {
@@ -413,7 +836,7 @@ void I2C_Init(void)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: TIMER_Init                                                                                    */
-/* Purpose : Configure TIMER1 as periodic 1Hz with LIRC for I2C auto-operation trigger                     */
+/* Purpose : Configure TIMER1 as periodic 1Hz with LIRC for I2C auto-operation trigger                   */
 /*---------------------------------------------------------------------------------------------------------*/
 void TIMER_Init(void)
 {
@@ -435,7 +858,7 @@ void TIMER_Init(void)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: Timer_PWM_Init                                                                                */
-/* Purpose : Configure TIMER0 PWM at 100Hz on PB5, accumulator + PDMA                                      */
+/* Purpose : Configure TIMER0 PWM at 100Hz on PB5, accumulator + PDMA                                    */
 /*---------------------------------------------------------------------------------------------------------*/
 void Timer_PWM_Init(void)
 {
@@ -465,11 +888,14 @@ void Timer_PWM_Init(void)
     /* Enable accumulator interrupt (software divider controls breathing speed) */
     TPWM_EnableAccInt(TIMER0);
     NVIC_EnableIRQ(TMR0_IRQn);
+
+    /* Enable TPWM interrupt wake-up so TMR0 ISR can wake CPU from NPD1 to update PWMCMPDAT */
+    TPWM_EnableWakeup(TIMER0);
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: PDMA_TX_Init                                                                                  */
-/* Purpose : Configure PDMA channel for I2C0 TX in scatter-gather mode                                     */
+/* Purpose : Configure PDMA channel for I2C0 TX in scatter-gather mode                                   */
 /*---------------------------------------------------------------------------------------------------------*/
 void PDMA_TX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
 {
@@ -483,7 +909,7 @@ void PDMA_TX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: PDMA_RX_Init                                                                                  */
-/* Purpose : Configure PDMA channel for I2C0 RX in scatter-gather mode; enable transfer-done interrupt     */
+/* Purpose : Configure PDMA channel for I2C0 RX in scatter-gather mode; enable transfer-done interrupt   */
 /*---------------------------------------------------------------------------------------------------------*/
 void PDMA_RX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
 {
@@ -500,44 +926,8 @@ void PDMA_RX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function: Build_PWM_SCTab                                                                               */
-/* Purpose : Build a single scatter-gather descriptor for Timer0 PWM PDMA (circular, SAR_INC)              */
-/* Transfers 7 words from SrcArray_PWM[] to PWMCMPDAT, one per trigger, then loops.              */
-/*---------------------------------------------------------------------------------------------------------*/
-void Build_PWM_SCTab(void)
-{
-    DMA_DESC_PWM[0].ctl = PDMA_OP_SCATTER |
-                          PDMA_REQ_SINGLE |
-                          PDMA_SAR_INC |               /* Increment through SrcArray_PWM[0..6] */
-                          PDMA_DAR_FIX |               /* Destination: TIMER0->PWMCMPDAT (fixed) */
-                          PDMA_WIDTH_32 |
-                          PDMA_TBINTDIS_DISABLE |
-                          ((PWM_PDMA_LENGTH - 1) << PDMA_DSCT_CTL_TXCNT_Pos);  /* 7 transfers */
-    DMA_DESC_PWM[0].src    = (uint32_t)&SrcArray_PWM[0];
-    DMA_DESC_PWM[0].dest   = (uint32_t)&(TIMER0->PWMCMPDAT);
-    DMA_DESC_PWM[0].offset = (uint32_t)&DMA_DESC_PWM[0] - (PDMA0->SCATBA);  /* Circular: point to self */
-}
-
-/*---------------------------------------------------------------------------------------------------------*/
-/* Function: PDMA_PWM_Init                                                                                 */
-/* Purpose : Configure PDMA channel for Timer0 PWM duty updates (scatter-gather circular mode)             */
-/*---------------------------------------------------------------------------------------------------------*/
-void PDMA_PWM_Init(void)
-{
-    /* Reset PDMA CH2 to clear any stale state */
-    PDMA_RESET(PDMA0, PWM_PDMA_CH);
-    PDMA_Open(PDMA0, 1 << PWM_PDMA_CH);
-
-    /* Build single circular scatter-gather descriptor */
-    Build_PWM_SCTab();
-
-    /* Set transfer mode: scatter-gather, triggered by PDMA_TMR0 */
-    PDMA_SetTransferMode(PDMA0, PWM_PDMA_CH, PDMA_TMR0, 1, (uint32_t)&DMA_DESC_PWM[0]);
-}
-
-/*---------------------------------------------------------------------------------------------------------*/
 /* Function: I2C_Trigger_Init                                                                              */
-/* Purpose : Configure I2C0 auto-operation mode, trigger source, and RX/TX byte count                      */
+/* Purpose : Configure I2C0 auto-operation mode, trigger source, and RX/TX byte count                    */
 /*---------------------------------------------------------------------------------------------------------*/
 void I2C_Trigger_Init(uint32_t u32Mode, uint32_t u32Src, uint32_t u32RxCnt, uint32_t u32TxCnt)
 {
@@ -560,7 +950,7 @@ void I2C_Trigger_Init(uint32_t u32Mode, uint32_t u32Src, uint32_t u32RxCnt, uint
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function: AutoOperation_FunctionTest                                                                    */
-/* Purpose : Main test function: setup PDMA transfers, enter power-down, decode temperature on wakeup      */
+/* Purpose : Main test function: setup PDMA transfers, enter power-down, decode temperature on wakeup    */
 /*---------------------------------------------------------------------------------------------------------*/
 void AutoOperation_FunctionTest(void)
 {
@@ -592,20 +982,46 @@ void AutoOperation_FunctionTest(void)
     /* Auto operation random read mode with repeat start, triggered by TIMER1 */
     I2C_Trigger_Init(I2C_RANDOM_REPEAT_STA, I2C_AUTOCTL_TRIGSEL_TMR1, SG_RX_LENGTH, SG_TX_LENGTH);
 
-    /* Wait for PDMA RX done (Timer1 triggers I2C auto-op every 1 second) */
+    /* Enter NPD1 power-down while waiting for PDMA RX done.
+     * Timer0 (LIRC, PDCLKEN) keeps PWM output running in NPD1.
+     * Timer1 (LIRC, PDCLKEN) triggers I2C auto-operation in NPD1.
+     * CPU wakes on TMR0 accumulator ISR (breathing LED update) or PDMA0 ISR (I2C RX done).
+     * Re-enter NPD1 after TMR0 ISR if PDMA_DONE is still 0. */
     {
-        uint32_t u32Timeout = SystemCoreClock;
+        uint32_t u32Timeout = 1000; /* ~10 seconds at 100Hz TMR0 wake-up rate */
+
+        SYS_UnlockReg();
+        CLK_SetPowerDownMode(CLK_PMUCTL_PDMSEL_NPD1);
+        CLK->PMUCTL = (CLK->PMUCTL & ~(CLK_PMUCTL_PDLDCSEL_Msk)) | CLK_PMUCTL_PDLDCSEL_ULP;
+
         while (!PDMA_DONE)
         {
+            /* Clear all wakeup flags before entering power-down */
+            CLK->PMUSTS |= CLK_PMUSTS_CLRWK_Msk;
+
+            /* Ensure UART TX is fully flushed before stopping HIRC in NPD1,
+             * otherwise a byte in mid-transmission gets corrupted. */
+            UART_WAIT_TX_EMPTY(UART0);
+
+            CLK_PowerDown();    /* CPU enters NPD1 here until next interrupt */
+
             if (u32Timeout-- == 0)
             {
-                printf("PDMA timeout error!\\n");
+                printf("PDMA timeout error!\n");
+                SYS_LockReg();
                 return;
             }
         }
+
+        SYS_LockReg();
     }
 
-    printf("I2C0 Rx done\\n");
+    /* Wait for HIRC stable after NPD1 wakeup before using UART */
+    CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
+
+    printf("Wakeup\n");
+
+    printf("I2C0 Rx done\n");
 
     /* Decode raw temperature data from NCT7712Y (12-bit, 0.0625 C/LSB) and print result */
     for (i = 0; i < SG_RX_TAB_NUM * 2; i += 2)
@@ -632,22 +1048,22 @@ void AutoOperation_FunctionTest(void)
             NCT7712Y_Data_F = (float)(NCT7712Y_Data * 0.0625f);
         }
 
-        printf("Current Temperature = %.4f degrees Celsius.\\n", NCT7712Y_Data_F);
+        printf("Current Temperature = %.4f degrees Celsius.\n", NCT7712Y_Data_F);
     }
 
     /* Adjust breathing speed via software divider (no IFACNT change, no stop/start needed) */
     if (NCT7712Y_Data_F > 27.0f)
     {
         g_u32BreathDiv = 5;    /* Fast: duty changes every 5 periods = 50ms, full cycle = 350ms */
-        printf("Fast breathing\\n");
+        printf("Fast breathing\n");
     }
     else
     {
         g_u32BreathDiv = 60;   /* Slow: duty changes every 60 periods = 600ms, full cycle = 4.2s */
-        printf("Slow breathing\\n");
+        printf("Slow breathing\n");
     }
 
-    printf("\\n");
+    printf("\n");
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -731,8 +1147,6 @@ void UART0_Init(void)
 /*---------------------------------------------------------------------------------------------------------*/
 int32_t main(void)
 {
-    uint32_t i;
-
     /* Unlock protected registers */
     SYS_UnlockReg();
 
@@ -768,12 +1182,12 @@ int32_t main(void)
     TPWM_START_COUNTER(TIMER0);
 
     /* Print description message */
-    printf("+-------------------------------------------------------------+\\n");
-    printf("| M2U51 I2C + Timer PWM Breathing LED Sample Code             |\\n");
-    printf("|                                                             |\\n");
-    printf("| I2C Master (I2C0) <---> NCT7712Y Temperature Sensor         |\\n");
-    printf("| Timer0 PWM breathing on PB5, speed adjusts by temperature   |\\n");
-    printf("+-------------------------------------------------------------+\\n\\n");
+    printf("+-------------------------------------------------------------+\n");
+    printf("| M2U51 I2C + Timer PWM Breathing LED Sample Code             |\n");
+    printf("|                                                             |\n");
+    printf("| I2C Master (I2C0) <---> NCT7712Y Temperature Sensor         |\n");
+    printf("| Timer0 PWM breathing on PB5, speed adjusts by temperature   |\n");
+    printf("+-------------------------------------------------------------+\n\n");
     UART_WAIT_TX_EMPTY(UART0);
 
     /* Main loop */
@@ -781,716 +1195,469 @@ int32_t main(void)
     {
         AutoOperation_FunctionTest();
     }
-}`;
+}</script>
 
-        // Normalize non-breaking spaces safely to regular spaces in memory as well
-        const fullSourceCode = rawFullSourceCode.replace(/\u00a0/g, ' ');
+    <script>
+        let currentStep = 0;
+        const totalSteps = 6; // 0, 1, 2, 3, 4, 5
+        let selectedTab = 'step'; // 'step' or 'full'
+        let temperatureValue = 25.0;
+        let isCastleRunning = false;
 
-        // STEP PEDAGOGICAL CONTENT & CODE SEGMENTS
-        const steps = [
-            {
-                category: "1. 專案宣告與全域常數",
-                badge: "步驟 1 / 5",
-                title: "全域架構、DMA 結構與緩衝區配置",
-                content: `
-                    <p class="mb-2">在本專案中，我們實作一個利用 <strong>Nuvoton M2U51</strong> 控制 <strong>I2C (NCT7712Y 溫度感測器)</strong> 與 <strong>Timer0 PWM (呼吸 LED 接腳 PB5)</strong> 的自動化溫控系統。</p>
-                    <p class="mb-3">首先，定義 Scatter-gather DMA 所需的結構體及與 I2C、PWM 相關的緩衝區常數：</p>
-                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 mb-4 space-y-1.5 text-xs font-mono text-slate-300">
-                        <div class="text-amber-400 font-bold mb-1">主要配置常數解說：</div>
-                        <div><span class="text-rose-400">DMA_DESC_T</span>: 散集 (Scatter-gather) descriptor 結構體。</div>
-                        <div><span class="text-rose-400">I2C0_PDMA_TX_CH (0)</span> / <span class="text-rose-400">I2C0_PDMA_RX_CH (1)</span>: I2C0 自動運作所需的傳送與接收 PDMA 頻道。</div>
-                        <div><span class="text-rose-400">SrcArray_PWM</span>: 存放 7 階呼吸佔空比的硬體配置表。</div>
-                        <div><span class="text-rose-400">g_u32BreathDiv</span>: 軟體計數除頻器（預設為 10），用於在 TMR0 中斷裡動態改變呼吸燈速度。</div>
-                    </div>
-                    <div class="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex items-start gap-2">
-                        <i class="fa-solid fa-circle-info text-blue-400 mt-0.5"></i>
-                        <p class="text-xs text-blue-300">請檢視右側程式區塊。點擊右上角的 <strong>「複製此步驟程式碼」</strong> 即可將基礎架構與宣告貼入您的 Keil <code>main.c</code> 檔案中。</p>
-                    </div>
-                `,
-                code: `#include <stdio.h>
-#include <string.h>
-#include "NuMicro.h"
-#include "Common.h"
-
-/* DMA 描述結構體宣告 */
-typedef struct dma_desc_t
+        // 當前步驟片段代碼對應表
+        const stepSnippets = {
+            0: `// M2U51 I2C + Timer PWM 呼吸燈智慧整合專案 (系統核心架構)
+int32_t main(void)
 {
-    uint32_t ctl;
-    uint32_t src;
-    uint32_t dest;
-    uint32_t offset;
-} DMA_DESC_T;
-
-/* I2C PDMA 通道與參數定義 */
-#define I2C0_PDMA_TX_CH    0
-#define I2C0_PDMA_RX_CH    1
-#define PWM_PDMA_CH        2
-
-#define SG_TX_TAB_NUM      1
-#define SG_RX_TAB_NUM      5
-#define SG_TX_LENGTH       3
-#define SG_RX_LENGTH       2
-#define SG_BASE_ADDR       0x20000000
-
-/* PWM 呼吸長度 (共 7 階佔空比轉換) */
-#define PWM_PDMA_LENGTH    7
-
-/* 全域緩衝暫存區 */
-uint8_t SrcArray[SG_TX_LENGTH * SG_TX_TAB_NUM];
-uint8_t DestArray[SG_RX_LENGTH * SG_RX_TAB_NUM];
-uint32_t SrcArray_PWM[PWM_PDMA_LENGTH];
-
-DMA_DESC_T DMA_DESC_SC_TX[SG_TX_TAB_NUM];
-DMA_DESC_T DMA_DESC_SC_RX[SG_RX_TAB_NUM];
-DMA_DESC_T DMA_DESC_PWM[1];
-
-typedef void (*I2C_FUNC)(uint32_t u32Status);
-volatile static I2C_FUNC s_I2C0HandlerFn = NULL;
-
-uint32_t NCT7712Y_Data = 0;
-float NCT7712Y_Data_F = 0;
-volatile uint32_t PDMA_DONE = 0;
-uint8_t g_u8DeviceAddr = 0x48;
-uint32_t PWM_PERIOD_Value;
-
-/* 軟體除頻變數：控制 PWM 呼吸更新頻率 */
-volatile uint32_t g_u32PWMIdx = 0;
-volatile uint32_t g_u32BreathDiv = 10;     /* 多少個中斷觸發一次佔空比切換 */
-volatile uint32_t g_u32BreathCnt = 0;`
-            },
-            {
-                category: "2. 腳位與時鐘設定",
-                badge: "步驟 2 / 5",
-                title: "時鐘源分流與多功能引腳複用配置",
-                content: `
-                    <p class="mb-2">在 M2U51 晶片上，各個外設功能的正常運作取決於時鐘配置。為了在低功耗或睡眠下維持 Timer 運作，我們必須特別對時鐘進行配置：</p>
-                    <p class="mb-3 font-semibold text-rose-400">⚙️ 時鐘與接腳設定重點：</p>
-                    <ul class="list-disc pl-5 space-y-2 text-xs text-slate-300">
-                        <li><strong>HIRC (高速內部 RC)</strong>：設為 HCLK (系統時鐘) 的主要時鐘來源。</li>
-                        <li><strong>LIRC (低速內部 RC)</strong>：特別設定給 <strong>TIMER0 (PWM)</strong> 與 <strong>TIMER1 (I2C 自動觸發)</strong>，確保在省電或休眠模式下定時器仍持續運作，不發生閃斷。</li>
-                        <li><strong>引腳配置 (MFP)</strong>：
-                            <br>- <strong>PB13</strong> 設為 <code>UART0_TXD</code> (單純輸出，節省功耗)。
-                            <br>- <strong>PC0 / PC1</strong> 設為 <code>I2C0_SDA</code> 與 <code>I2C0_SCL</code>，並啟用 Schmitt 觸發器濾除雜訊。
-                            <br>- <strong>PB5</strong> 設為 <code>TM0</code> (Timer0 PWM 控制輸出接腳)。
-                        </li>
-                    </ul>
-                `,
-                code: `void SYS_Init(void)
-{
-    /* 1. 解鎖暫存器 */
     SYS_UnlockReg();
+    Min_Current_Init();  // 1. 初始化系統最低功耗配置，避免空置引腳漏電
+    SYS_Init();          // 2. 初始化時脈樹、系統外設 HCLK 與 I/O 腳位複用
+    UART0_Init();        // 3. 初始化除錯偵錯 COM 埠 (Baud rate: 115200)
+    I2C_Init();          // 4. 初始化 I2C0 主機通訊模式並開啟中斷
+    TIMER_Init();        // 5. 初始化 Timer1 定時自動讀取發條 (週期為 1Hz)
+    TIMER_Start(TIMER1);
+    Timer_PWM_Init();    // 6. 初始化 Timer0 PWM 呼吸燈硬體結構
+    
+    // 建立 LED 動態亮度查找陣列 (20% ~ 100%)
+    SrcArray_PWM[0] = PWM_PERIOD_Value * 20 / 100;
+    SrcArray_PWM[1] = PWM_PERIOD_Value * 40 / 100;
+    SrcArray_PWM[2] = PWM_PERIOD_Value * 80 / 100;
+    SrcArray_PWM[3] = PWM_PERIOD_Value * 100 / 100;
+    SrcArray_PWM[4] = PWM_PERIOD_Value * 80 / 100;
+    SrcArray_PWM[5] = PWM_PERIOD_Value * 40 / 100;
+    SrcArray_PWM[6] = PWM_PERIOD_Value * 20 / 100;
 
-    /* 2. 啟用內部 HIRC 與 LIRC 振盪器 */
+    TPWM_START_COUNTER(TIMER0); // 啟動呼吸燈計數硬體
+
+    while (1) {
+        // 主迴圈閉迴路：NPD1 休眠、自動搬運、喚醒調速
+        AutoOperation_FunctionTest(); 
+    }
+}`,
+            1: `void SYS_Init(void)
+{
+    SYS_UnlockReg();
+    // 1. 啟用內部 HIRC (48MHz) 與 LIRC (38.4kHz)
     CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk | CLK_PWRCTL_LIRCEN_Msk);
     CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
     CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
 
-    /* 3. 設定系統時鐘 (HCLK) 為 HIRC 1分頻 */
+    // 2. 設定 CPU 主頻為 HIRC 48MHz
     CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_HIRC, CLK_HCLKDIV_HCLK(1));
-    CLK->PCLKDIV = (CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2);
-    SystemCoreClockUpdate();
 
-    /* 4. 設定外設時鐘源：Timer0 & Timer1 均導向 LIRC */
-    CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL2_UART0SEL_HIRC, CLK_CLKDIV_UART0(1));
+    // 3. 配置 Timer0PWM 及 Timer1 分別參考慢速 LIRC 時鐘，確保掉電可運行
     CLK_SetModuleClock(TMR0_MODULE, CLK_CLKSEL1_TMR0SEL_LIRC, MODULE_NoMsk);
     CLK_SetModuleClock(TMR1_MODULE, CLK_CLKSEL1_TMR1SEL_LIRC, MODULE_NoMsk);
 
-    /* 5. 啟用時鐘模組 */
-    CLK_EnableModuleClock(UART0_MODULE);
-    CLK_EnableModuleClock(I2C0_MODULE);
-    CLK_EnableModuleClock(TMR0_MODULE);
-    CLK_EnableModuleClock(TMR1_MODULE);
-    CLK_EnableModuleClock(PDMA0_MODULE);
-    CLK_EnableModuleClock(GPA_MODULE);
-    CLK_EnableModuleClock(GPB_MODULE);
-    CLK_EnableModuleClock(GPC_MODULE);
-
-    /* 6. 設定多功能 MFP 引腳 */
-    /* PB13 -> UART0 TX */
-    SYS->GPB_MFPH = (SYS->GPB_MFPH & ~SYS_GPB_MFPH_PB13MFP_Msk) | SYS_GPB_MFPH_PB13MFP_UART0_TXD;
-    /* PC0 / PC1 -> I2C0 SDA/SCL */
-    SYS->GPC_MFPL = (SYS->GPC_MFPL & ~(SYS_GPC_MFPL_PC0MFP_Msk | SYS_GPC_MFPL_PC1MFP_Msk)) |
-                     (SYS_GPC_MFPL_PC0MFP_I2C0_SDA | SYS_GPC_MFPL_PC1MFP_I2C0_SCL);
-    PC->SMTEN |= (GPIO_SMTEN_SMTEN0_Msk | GPIO_SMTEN_SMTEN1_Msk); // 啟用 Schmitt Trigger
-    /* PB5 -> TM0 (PWM 輸出通道) */
+    // 4. 開啟 GPIO PB5 與 I2C 腳位之複用設定 (PB5 -> TM0, PC0 -> SDA, PC1 -> SCL)
     SYS->GPB_MFPL = (SYS->GPB_MFPL & ~SYS_GPB_MFPL_PB5MFP_Msk) | SYS_GPB_MFPL_PB5MFP_TM0;
-
-    /* 7. 重新鎖定暫存器保護 */
     SYS_LockReg();
-}`
-            },
-            {
-                category: "3. PWM 呼吸燈控制內容",
-                badge: "步驟 3 / 5",
-                title: "Timer0 PWM 模式初始化與累加中斷處理",
-                content: `
-                    <p class="mb-2"><strong>呼吸燈機制的核心原理：</strong></p>
-                    <p class="mb-3">我們將 Timer0 配置成 100Hz 的 PWM 模式。為了在切換呼吸速度時「完全不閃斷、不中斷計數器」，我們使用<strong>硬體累加器中斷 (Accumulator Interrupt)</strong> 配合<strong>軟體除頻器</strong>：</p>
-                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 text-xs font-mono text-slate-300 mb-3">
-                        <p class="text-amber-400 font-bold">1. Timer_PWM_Init():</p>
-                        <p class="pl-3">設定頻率 100Hz 輸出至 PB5 (TM0)。啟用 <code>TPWM_EnableAcc()</code> 讓每個週期（10ms）自動觸發一次中斷。</p>
-                        <p class="text-amber-400 font-bold">2. TMR0_IRQHandler():</p>
-                        <p class="pl-3">中斷每 10ms 觸發一次，軟體計數器 <code>g_u32BreathCnt</code> 累加，當達到閥值 <code>g_u32BreathDiv</code> 時，才將下一個佔空比數值寫入 <code>PWMCMPDAT</code>，以此平滑改變亮度。</p>
-                    </div>
-                    <p class="text-xs text-slate-400">改變呼吸速度時，只需修改全域變數 <code>g_u32BreathDiv</code>，而 Timer0 硬體本身完全不需重啟！</p>
-                `,
-                code: `/* Timer0 PWM 模式初始化 (PB5 輸出, 頻率 100Hz) */
-void Timer_PWM_Init(void)
+}`,
+            2: `void UART0_Init(void)
 {
-    /* 啟用 Timer0 PWM 模式 */
+    /* 重設 UART0 周邊 */
+    SYS_ResetModule(UART0_RST);
+
+    /* 設定偵錯鮑率為 115200 */
+    UART_Open(UART0, 115200);
+}
+
+// 在 main.c 中排除 RX 引腳，並在休眠前排除引腳浮接漏電
+Min_Current_Init();`,
+            3: `void Timer_PWM_Init(void)
+{
     TPWM_ENABLE_PWM_MODE(TIMER0);
+    TPWM_ENABLE_OUTPUT(TIMER0, TPWM_CH0); // 啟用 PB5 (CH0) 輸出
+    TPWM_ConfigOutputFreqAndDuty(TIMER0, 100, 0); // 100Hz 基礎頻率
 
-    /* 啟用 PB5 (CH0) 輸出 */
-    TPWM_ENABLE_OUTPUT(TIMER0, TPWM_CH0);
+    TIMER0->CTL |= TIMER_CTL_PDCLKEN_Msk; // 啟用 Power-down 引擎時鐘
 
-    /* 設定 100Hz 頻率，初始 Duty 0% */
-    TPWM_ConfigOutputFreqAndDuty(TIMER0, 100, 0);
-
-    /* 讀取週期計數最大值，供後續 Duty 計算使用 */
-    PWM_PERIOD_Value = TIMER0->PWMPERIOD + 1;
-
-    /* 啟用 Power-down 計數時鐘 */
-    TIMER0->CTL |= TIMER_CTL_PDCLKEN_Msk;
-
-    SYS_UnlockReg();
-    TIMER0->PWMCTL |= TIMER_PWMCTL_DBGTRIOFF_Msk; // Debug 模式下保持運行
-    SYS_LockReg();
-
-    /* 啟用累加器：每個 PWM 週期點觸發一次中斷 (10ms @ 100Hz) */
+    // 啟用累加器中斷 (每 1 個週期觸發一次，即 100 次/秒)
     TPWM_EnableAcc(TIMER0, 0, TPWM_IFA_PERIOD_POINT);
-
-    /* 啟用累加器中斷 */
     TPWM_EnableAccInt(TIMER0);
     NVIC_EnableIRQ(TMR0_IRQn);
-}
-
-/* Timer0 累加器中斷服務函式 (更新 PWM 佔空比) */
-void TMR0_IRQHandler(void)
-{
-    if (TIMER0->PWMAINTSTS & TIMER_PWMAINTSTS_IFAIF_Msk)
-    {
-        /* 清除中斷旗標 */
-        TIMER0->PWMAINTSTS = TIMER_PWMAINTSTS_IFAIF_Msk;
-
-        /* 軟體除頻器計數 */
-        if (++g_u32BreathCnt >= g_u32BreathDiv)
-        {
-            g_u32BreathCnt = 0;
-            /* 寫入下一個佔空比值至比較暫存器 */
-            TIMER0->PWMCMPDAT = SrcArray_PWM[g_u32PWMIdx];
-            g_u32PWMIdx = (g_u32PWMIdx + 1) % PWM_PDMA_LENGTH; // 循環輪詢 7 階 Duty Table
-        }
-    }
-}`
-            },
-            {
-                category: "4. 自動觸發與 PDMA 設置",
-                badge: "步驟 4 / 5",
-                title: "Timer1 自動觸發 I2C0 與 PDMA 散集傳輸設定",
-                content: `
-                    <p class="mb-2"><strong>完全不佔用 CPU 資源的 I2C 讀取：</strong></p>
-                    <p class="mb-3">在此步驟，利用 Timer1 的 Timeout 旗標，在硬體底層定時（每秒 1 次）直接喚醒並自動觸發 I2C0 發送讀寫週期：</p>
-                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1.5 text-xs text-slate-300">
-                        <p>1. <strong>TIMER_Init()</strong>：配置 TIMER1 為 1Hz 定時模式，並啟用 Power-down 時鐘，設定觸發目標為 IPS 外設（I2C0）。</p>
-                        <p>2. <strong>PDMA Scatter-Gather 描述表</strong>：
-                            <br>- 發送端 (CH0) 搬移 I2C 寫入封包 <code>[SLV+W, RegAddr, SLV+R]</code> 至 <code>I2C0->DAT</code>。
-                            <br>- 接收端 (CH1) 則在最後一個 entry 設定 BASIC 模式，並啟用 PDMA 傳輸完成中斷以喚醒系統，並將資料放入 <code>DestArray</code> 中。
-                        </p>
-                    </div>
-                `,
-                code: `/* Timer1 定時器初始化 (1Hz 自動觸發) */
-void TIMER_Init(void)
-{
-    /* 設定 Timer1 週期模式，每秒 (1Hz) 觸發一次 */
-    TIMER_Open(TIMER1, TIMER_PERIODIC_MODE, 1);
-
-    /* 啟用 Power-down 休眠時鐘引擎 */
-    TIMER1->CTL |= TIMER_CTL_PDCLKEN_Msk;
-
-    /* Timer 逾時事件自動硬體觸發 I2C */
-    TIMER_SetATriggerSource(TIMER1, TIMER_ATRGSRC_TIMEOUT_EVENT);
-    TIMER_SetATriggerTarget(TIMER1, TIMER_ATRG_TO_IPS);
-
-    /* 禁用 Timer0 本身喚醒 CPU (交由 PDMA 完成中斷喚醒) */
-    TIMER_DisableWakeup(TIMER1);
-}
-
-/* 建立接收端 Scatter-gather 描述鏈結表 */
+    TPWM_EnableWakeup(TIMER0); // 開啟中斷喚醒機制
+}`,
+            4: `// 建立自動搬運描述符 (Scatter-Gather Tab)
 void Build_Rx_SCTab(uint32_t u32TabNum, uint32_t u32RxSize, uint32_t u32StartAddr)
 {
-    uint32_t i;
-    for (i = 0; i < u32TabNum; i++)
-    {
-        DMA_DESC_SC_RX[i].ctl = PDMA_OP_SCATTER |
-                                PDMA_REQ_SINGLE |
-                                PDMA_SAR_FIX |            /* 來源端為固定的 I2C0->DAT */
-                                PDMA_DAR_INC |            /* 目的端快取緩衝區累加 */
-                                PDMA_WIDTH_8 |
-                                PDMA_TBINTDIS_DISABLE |
-                                ((u32RxSize - 1) << PDMA_DSCT_CTL_TXCNT_Pos);
-        DMA_DESC_SC_RX[i].src    = (uint32_t)&(I2C0->DAT);
-        DMA_DESC_SC_RX[i].dest   = (uint32_t)(u32StartAddr + i * u32RxSize);
-        DMA_DESC_SC_RX[i].offset = (uint32_t)&DMA_DESC_SC_RX[0] + 0x10 * (i + 1) - (PDMA0->SCATBA);
+    for (uint32_t i = 0; i < u32TabNum; i++) {
+        DMA_DESC_SC_RX[i].ctl = PDMA_OP_SCATTER | PDMA_DAR_INC | ...;
+        DMA_DESC_SC_RX[i].src  = (uint32_t)&(I2C0->DAT);
+        DMA_DESC_SC_RX[i].dest = (uint32_t)(u32StartAddr + i * u32RxSize);
     }
+    // 最後一張卡設置為 BASIC 模式，收尾並發出完成中斷
+    DMA_DESC_SC_RX[u32TabNum-1].ctl &= ~PDMA_DSCT_CTL_OPMODE_Msk;
+    DMA_DESC_SC_RX[u32TabNum-1].ctl |= PDMA_OP_BASIC | PDMA_TBINTDIS_ENABLE;
+}
 
-    /* 最後一個傳送點：啟用 Done 中斷並切換回 Basic 模式 */
-    DMA_DESC_SC_RX[u32TabNum - 1].ctl = (DMA_DESC_SC_RX[u32TabNum - 1].ctl & ~(PDMA_DSCT_CTL_TBINTDIS_Msk | PDMA_DSCT_CTL_OPMODE_Msk)) |
-                                        (PDMA_TBINTDIS_ENABLE | PDMA_OP_BASIC);
-    DMA_DESC_SC_RX[u32TabNum - 1].offset = 0;
-}`
-            },
-            {
-                category: "5. 溫度判斷與呼吸變速",
-                badge: "步驟 5 / 5",
-                title: "解碼 NCT7712Y 溫度與過溫 27°C 警報判斷",
-                content: `
-                    <p class="mb-2"><strong>動態控制與實作整合：</strong></p>
-                    <p class="mb-3">當 PDMA 接收完成中斷被觸發（<code>PDMA_DONE = 1</code>），代表已取得最新的 NCT7712Y 的 12-bit 溫度資料。我們對其進行二補數解碼（以支援負溫度），接著落實主要的閥值切換邏輯：</p>
-                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-1.5 text-xs text-slate-300 font-mono mb-3">
-                        <div class="text-rose-400 font-bold mb-1">🌡️ 變速判斷規則：</div>
-                        <p><strong>大於 27.0°C (過溫過熱)</strong>：</p>
-                        <p class="pl-3">→ 設定 <code>g_u32BreathDiv = 5</code></p>
-                        <p class="pl-3 text-slate-400">（中斷每 50ms 更新一次 Duty，完整呼吸週期縮短至 350ms，表現為<strong>快速呼吸</strong>）</p>
-                        <p><strong>小於或等於 27.0°C (正常狀態)</strong>：</p>
-                        <p class="pl-3">→ 設定 <code>g_u32BreathDiv = 60</code></p>
-                        <p class="pl-3 text-slate-400">（中斷每 600ms 更新一次 Duty，完整呼吸週期為 4.2 秒，表現為<strong>慢速呼吸</strong>）</p>
-                    </div>
-                `,
-                code: `/* 溫度自動讀取測試與呼吸控制 */
-void AutoOperation_FunctionTest(void)
+// 綁定定時器 (Timer1) 發條，1秒觸發一次 I2C 讀取運作
+I2C_Trigger_Init(I2C_RANDOM_REPEAT_STA, I2C_AUTOCTL_TRIGSEL_TMR1, SG_RX_LENGTH, SG_TX_LENGTH);`,
+            5: `while (1)
 {
-    uint32_t i;
-    uint8_t *pu8Tmp;
+    // 大腦在發布傳送命令後，立刻呼叫 NPD1 掉電模式進入沉睡
+    SYS_UnlockReg();
+    CLK_PowerDown(); // 暫停高頻時鐘，進入超低功耗
+    SYS_LockReg();
 
-    PDMA_DONE = 0;
-
-    /* 1. 建立 I2C 隨機寫入/讀取封包 */
-    pu8Tmp = SrcArray;
-    for (i = 0; i < SG_TX_TAB_NUM; i++)
-    {
-        *pu8Tmp++ = ((g_u8DeviceAddr << 1) | 0x00);   /* SLV + W */
-        *pu8Tmp++ = 0x00;                              /* 暫存器地址 */
-        *pu8Tmp++ = ((g_u8DeviceAddr << 1) | 0x01);   /* SLV + R */
+    // 被 PDMA 中斷喚醒後，處理資料與溫度運算
+    if (PDMA_DONE) {
+        PDMA_DONE = 0;
+        float NCT7712Y_Temp = Decode_Temp_Data();
+        
+        // 智慧速度判定：高於 27 度時加快呼吸
+        if (NCT7712Y_Temp > 27.0f) {
+            g_u32BreathDiv = 5;   // 快速呼吸 (熱)
+        } else {
+            g_u32BreathDiv = 60;  // 慢速悠閒呼吸 (冷)
+        }
     }
+}`
+        };
 
-    s_I2C0HandlerFn = (I2C_FUNC)I2C_PDMA_MasterRx;
-    I2C_SET_CONTROL_REG(I2C0, I2C_CTL_AA);
+        // 樂高組裝進度描述字
+        const legoAssemblyLegends = {
+            0: "【專案簡介規劃中】尚未裝配任何實體零件。這是一個基於 M2U51 微控制器的樂高智慧城堡。我們將逐步引導您組裝綠色底板、除錯透視鏡、Timer0 呼吸摩天輪、I2C+PDMA 自動傳送帶，最後對接智慧大腦！請點擊「下一步」開始組裝基礎大底板。",
+            1: "【綠色大底板】已就定位！系統暫存器初始化與時脈結構完成設置。時脈 LIRC 38.4kHz 開放，為超省電環境奠定基礎。接下來，我們將組裝偵錯序列埠模組。",
+            2: "【除錯透視鏡（UART0）】已裝配！成功指定 PB13 為 TXD。大腦此時可以利用 printf 向外界傾訴心聲。下一個步驟，我們將為城堡裝上自動呼吸的 LED 摩天輪組件。",
+            3: "【呼吸摩天輪（Timer0 PWM）】已組裝！現在摩天輪正式掛載在低頻 LIRC 時鐘上，即便城堡失去高頻電力，它依然能完美地自行調速呼吸。接下來，我們將架設 PDMA 工廠傳送帶。",
+            4: "【工廠自動傳送帶（I2C+PDMA）】搭建完畢！自動化鏈結表已編織完成，1Hz 的 Timer1 定時發條將自動控制傳送帶工作。最後，我們將嵌入核心智慧控制大腦！",
+            5: "【智慧控制大腦】完美對接！樂高城堡全系統閉迴路正式組裝完畢！您現在可以在下方設定環境溫度，並點擊「啟動城堡系統」來觀看實際智慧低功耗循環效果！"
+        };
 
-    /* 2. 初始化 TX 及 RX 通道的 PDMA 鏈結設定 */
-    PDMA_TX_Init(I2C0_PDMA_TX_CH, SG_TX_TAB_NUM, SG_TX_LENGTH);
-    PDMA_RX_Init(I2C0_PDMA_RX_CH, SG_RX_TAB_NUM, SG_RX_LENGTH);
+        // 頁面加載初始化
+        window.onload = function() {
+            initFullCode();
+            goToStep(0);
+        }
 
-    /* 3. 配置 Random Read + Repeat Start 的 I2C0 自動硬體運作，觸發源設為 Timer1 */
-    I2C_Trigger_Init(I2C_RANDOM_REPEAT_STA, I2C_AUTOCTL_TRIGSEL_TMR1, SG_RX_LENGTH, SG_TX_LENGTH);
+        // 初始化完整程式碼與行號
+        function initFullCode() {
+            const rawCode = document.getElementById('full-main-code').textContent;
+            const lines = rawCode.split('\n');
+            
+            // 填寫行號
+            const lineNumbersBox = document.getElementById('line-numbers');
+            lineNumbersBox.innerHTML = lines.map((_, idx) => `<div>${idx + 1}</div>`).join('');
+            
+            // 填寫代碼
+            const fullCodeBox = document.getElementById('full-code-content');
+            fullCodeBox.textContent = rawCode;
+        }
 
-    /* 4. 等待每秒一次的 Timer1 觸發 I2C0 與 PDMA 傳輸完成 */
-    {
-        uint32_t u32Timeout = SystemCoreClock;
-        while (!PDMA_DONE)
-        {
-            if (u32Timeout-- == 0)
-            {
-                printf("PDMA timeout error!\\n");
+        // 步驟控制
+        function goToStep(step) {
+            // 切換引導文字顯示
+            for (let i = 0; i < totalSteps; i++) {
+                const content = document.getElementById(`step-content-${i}`);
+                if (content) {
+                    if (i === step) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                }
+
+                // 導航節點色彩更新
+                const stepNum = document.getElementById(`step-num-${i}`);
+                if (stepNum) {
+                    if (i < step) {
+                        stepNum.className = "w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all";
+                        stepNum.innerHTML = '<i class="fa-solid fa-check text-xs"></i>';
+                    } else if (i === step) {
+                        stepNum.className = "w-9 h-9 rounded-full bg-pulseRed text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all shadow-lg shadow-red-500/30 scale-110";
+                        stepNum.innerHTML = i;
+                    } else {
+                        stepNum.className = "w-9 h-9 rounded-full bg-[#F4F5F7] text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all";
+                        stepNum.innerHTML = i;
+                    }
+                }
+            }
+
+            // 更新當前步驟程式碼
+            document.getElementById('step-code-content').textContent = stepSnippets[step];
+
+            // 樂高組裝進度視覺變化（SVG 組件鎖定/解鎖控制）
+            updateLegoBlueprint(step);
+
+            currentStep = step;
+            updateFooterButtons();
+        }
+
+        // 樂高藍圖渲染與部件裝配
+        function updateLegoBlueprint(step) {
+            const parts = {
+                1: 'lego-plate',
+                2: 'lego-uart',
+                3: 'lego-wheel',
+                4: 'lego-conveyor',
+                5: 'lego-brain'
+            };
+
+            // 根據當前步驟，決定哪些部件已經「組裝解鎖」 (步驟 0 則全數未解鎖)
+            for (let i = 1; i <= 5; i++) {
+                const element = document.getElementById(parts[i]);
+                if (element) {
+                    if (i <= step) {
+                        element.classList.remove('lego-locked');
+                        element.classList.add('lego-unlocked');
+                    } else {
+                        element.classList.remove('lego-unlocked');
+                        element.classList.add('lego-locked');
+                    }
+                }
+            }
+
+            // 頂部小狀態更新 (最大組裝數為 5)
+            const progressValue = step;
+            document.getElementById('progress-percent-badge').innerText = `${progressValue * 20}%`;
+            document.getElementById('progress-bar-badge').style.width = `${progressValue * 20}%`;
+            document.getElementById('unlocked-count').innerText = progressValue;
+
+            // 右欄藍圖卡片文字狀態與描述更新
+            const legendDesc = document.getElementById('assembly-desc');
+            legendDesc.innerText = legoAssemblyLegends[step];
+
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
+
+            if (step === 5) {
+                statusDot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                statusTxt.innerText = "組裝完畢 (待命)";
+                statusTxt.className = "font-bold text-amber-500";
+                
+                // 啟用第五步專屬的溫度控制桿與觸發按鈕
+                document.getElementById('lego-temp-slider').removeAttribute('disabled');
+                document.getElementById('lego-temp-slider').className = "w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#D7262F]";
+                document.getElementById('btn-final-action').removeAttribute('disabled');
+                document.getElementById('btn-final-action').className = "w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10";
+                document.getElementById('btn-final-action').innerText = "點擊啟動城堡系統";
+                document.getElementById('cycle-trigger-tip').classList.remove('hidden');
+            } else {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+                statusTxt.innerText = step === 0 ? "設計規劃中" : "規劃組裝中";
+                statusTxt.className = "font-bold text-slate-500";
+
+                // 禁用溫控桿與觸發按鈕
+                document.getElementById('lego-temp-slider').setAttribute('disabled', 'true');
+                document.getElementById('lego-temp-slider').className = "w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400";
+                document.getElementById('btn-final-action').setAttribute('disabled', 'true');
+                document.getElementById('btn-final-action').className = "w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs cursor-not-allowed shadow-inner";
+                document.getElementById('btn-final-action').innerHTML = '<i class="fa-solid fa-play"></i> 點擊啟動城堡系統閉迴路';
+                document.getElementById('cycle-trigger-tip').classList.add('hidden');
+                
+                // 停止任何執行中的動畫
+                stopCastleAnimation();
+            }
+        }
+
+        // 頁底按鈕狀態
+        function updateFooterButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const progressLine = document.getElementById('step-progress-line');
+
+            if (currentStep === 0) {
+                prevBtn.setAttribute('disabled', 'true');
+            } else {
+                prevBtn.removeAttribute('disabled');
+            }
+
+            if (currentStep === totalSteps - 1) { // 5
+                nextBtn.innerHTML = '完成城堡組裝 <i class="fa-solid fa-award text-yellow-300"></i>';
+                nextBtn.className = "px-6 py-2 rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-500/10 text-sm font-semibold flex items-center gap-2 transition-all";
+            } else {
+                nextBtn.innerHTML = '下一步 <i class="fa-solid fa-arrow-right"></i>';
+                nextBtn.className = "px-6 py-2 rounded-xl text-white bg-[#D7262F] hover:bg-red-700 shadow-lg shadow-red-500/10 text-sm font-semibold flex items-center gap-2 transition-all";
+            }
+
+            // 進度線百分比計算 (總步驟為 6 階，故除以 5)
+            const progressPercent = (currentStep / (totalSteps - 1)) * 100;
+            progressLine.style.width = `${progressPercent}%`;
+        }
+
+        function changeStep(direction) {
+            let targetStep = currentStep + direction;
+            if (targetStep >= 0 && targetStep < totalSteps) {
+                goToStep(targetStep);
+            } else if (targetStep >= totalSteps) {
+                showCelebration();
+            }
+        }
+
+        // 程式碼視窗 Tab 切換控制
+        function switchCodeTab(tab) {
+            selectedTab = tab;
+            const btnStep = document.getElementById('tab-btn-step');
+            const btnFull = document.getElementById('tab-btn-full');
+            const containerStep = document.getElementById('code-container-step');
+            const containerFull = document.getElementById('code-container-full');
+            const searchBox = document.getElementById('search-container');
+
+            if (tab === 'step') {
+                btnStep.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-800 shadow-sm transition-all flex items-center gap-1";
+                btnFull.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1";
+                containerStep.classList.remove('hidden');
+                containerFull.classList.add('hidden');
+                searchBox.classList.add('hidden');
+            } else {
+                btnFull.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-800 shadow-sm transition-all flex items-center gap-1";
+                btnStep.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1";
+                containerStep.classList.add('hidden');
+                containerFull.classList.remove('hidden');
+                searchBox.classList.remove('hidden');
+            }
+        }
+
+        // 完整 main.c 內文全字搜尋
+        function searchInCode() {
+            const query = document.getElementById('code-search-input').value.toLowerCase();
+            const rawCode = document.getElementById('full-main-code').textContent;
+            const fullCodeBox = document.getElementById('full-code-content');
+
+            if (!query) {
+                fullCodeBox.textContent = rawCode;
                 return;
             }
-        }
-    }
 
-    printf("I2C0 Rx done\\n");
-
-    /* 5. 解碼 DestArray 回傳的 12-bit 溫度資料 */
-    for (i = 0; i < SG_RX_TAB_NUM * 2; i += 2)
-    {
-        NCT7712Y_Data  = DestArray[i];
-        NCT7712Y_Data <<= 8;
-        NCT7712Y_Data |= DestArray[i + 1];
-
-        NCT7712Y_Data >>= 4; /* 保留位 bit0~bit3 捨棄 */
-
-        /* 判斷正負溫度 */
-        if (NCT7712Y_Data & 0x800)
-        {
-            NCT7712Y_Data = ~NCT7712Y_Data & 0x00000FFF;
-            NCT7712Y_Data += 1;
-            NCT7712Y_Data_F = (float)(NCT7712Y_Data * -0.0625f);
-        }
-        else
-        {
-            NCT7712Y_Data_F = (float)(NCT7712Y_Data * 0.0625f);
-        }
-
-        printf("Current Temp = %.4f C.\\n", NCT7712Y_Data_F);
-    }
-
-    /* === 6. 核心增加判斷功能：超過 27 度快速呼吸，否則慢速呼吸 === */
-    if (NCT7712Y_Data_F > 27.0f)
-    {
-        g_u32BreathDiv = 5;    /* 快速：計數 5 次 (50ms) 更新一次 Duty */
-        printf("Fast breathing\\n");
-    }
-    else
-    {
-        g_u32BreathDiv = 60;   /* 慢速：計數 60 次 (600ms) 更新一次 Duty */
-        printf("Slow breathing\\n");
-    }
-}`
-            }
-        ];
-
-        // STATE VARS
-        let currentStepIndex = 0;
-        let isFullCodeMode = false;
-
-        // DOM ELEMENTS
-        const stepBadge = document.getElementById("stepBadge");
-        const stepCategory = document.getElementById("stepCategory");
-        const stepTitle = document.getElementById("stepTitle");
-        const stepContent = document.getElementById("stepContent");
-        
-        // Code viewer nodes
-        const codeDisplay = document.getElementById("codeDisplay");
-        const lineNumbers = document.getElementById("lineNumbers");
-        const codeFileName = document.getElementById("codeFileName");
-        const copyCodeBtn = document.getElementById("copyCodeBtn");
-        
-        // Tab modes
-        const modeStepBtn = document.getElementById("modeStepBtn");
-        const modeFullBtn = document.getElementById("modeFullBtn");
-        
-        // Navigation nodes
-        const prevBtn = document.getElementById("prevBtn");
-        const nextBtn = document.getElementById("nextBtn");
-        const progressBar = document.getElementById("progressBar");
-        const progressText = document.getElementById("progressText");
-        const stepIndicatorContainer = document.getElementById("stepIndicatorContainer");
-        
-        // Toast
-        const toast = document.getElementById("toast");
-        const toastMsg = document.getElementById("toastMsg");
-
-        // INITIALIZE QUICK JUMP NAVIGATION BUTTONS
-        function initStepIndicators() {
-            stepIndicatorContainer.innerHTML = "";
-            steps.forEach((step, idx) => {
-                const btn = document.createElement("button");
-                btn.className = `py-1.5 rounded-lg text-xs font-mono font-bold border transition ${
-                    idx === currentStepIndex 
-                    ? "bg-amber-500 text-slate-950 border-amber-400 font-extrabold scale-105" 
-                    : "bg-[#0f172a] hover:bg-slate-800 text-slate-400 border-slate-800"
-                }`;
-                btn.innerText = `S${idx + 1}`;
-                btn.addEventListener("click", () => {
-                    currentStepIndex = idx;
-                    renderStep();
-                });
-                stepIndicatorContainer.appendChild(btn);
+            const lines = rawCode.split('\n');
+            const highlightedLines = lines.map(line => {
+                if (line.toLowerCase().includes(query)) {
+                    // 將符合搜尋字串的部分加上標註
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    return line.replace(regex, `<span class="bg-amber-500/40 text-white font-bold">$1</span>`);
+                }
+                return line;
             });
+
+            fullCodeBox.innerHTML = highlightedLines.join('\n');
         }
 
-        // HTML Character Escaping
-        function escapeHtml(text) {
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
-        }
+        // 樂高溫度調節桿
+        function updateLegoTemp(val) {
+            temperatureValue = parseFloat(val).toFixed(1);
+            document.getElementById('temp-display-right').innerText = `${temperatureValue} °C`;
 
-        // IMMUNE-TO-NESTED-CONFLICT TOKENIZER HIGHLIGHTER
-        function highlightCCode(code) {
-            // Clean non-breaking spaces before processing
-            const cleanCode = code.replace(/\u00a0/g, ' ');
-            
-            const tokens = [];
-            let i = 0;
-            
-            const keywords = new Set(['for', 'if', 'else', 'while', 'return', 'switch', 'case', 'break', 'default']);
-            const types = new Set([
-                'uint32_t', 'uint8_t', 'int32_t', 'float', 'void', 'int', 'int32_t',
-                'typedef', 'struct', 'volatile', 'static', 'char', 'double', 
-                'int16_t', 'uint16_t', 'DMA_DESC_T', 'I2C_FUNC'
-            ]);
-
-            while (i < cleanCode.length) {
-                // 1. Multi-line Comments
-                if (cleanCode.substr(i, 2) === '/*') {
-                    let end = cleanCode.indexOf('*/', i + 2);
-                    if (end === -1) end = cleanCode.length;
-                    else end += 2;
-                    tokens.push({ type: 'comment', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 2. Single-line Comments
-                if (cleanCode.substr(i, 2) === '//') {
-                    let end = cleanCode.indexOf('\n', i + 2);
-                    if (end === -1) end = cleanCode.length;
-                    tokens.push({ type: 'comment', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 3. Preprocessor Directive
-                if (cleanCode[i] === '#') {
-                    let end = i + 1;
-                    while (end < cleanCode.length && /[a-zA-Z]/.test(cleanCode[end])) {
-                        end++;
-                    }
-                    tokens.push({ type: 'preprocessor', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 4. Strings
-                if (cleanCode[i] === '"' || cleanCode[i] === "'") {
-                    let quote = cleanCode[i];
-                    let end = i + 1;
-                    while (end < cleanCode.length && cleanCode[end] !== quote) {
-                        if (cleanCode[end] === '\\') end += 2; // escape sequences
-                        else end++;
-                    }
-                    if (end < cleanCode.length) end++; // include enclosing quote
-                    tokens.push({ type: 'string', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 5. Hex numbers
-                if (cleanCode.substr(i, 2) === '0x' || cleanCode.substr(i, 2) === '0X') {
-                    let end = i + 2;
-                    while (end < cleanCode.length && /[0-9a-fA-F]/.test(cleanCode[end])) {
-                        end++;
-                    }
-                    tokens.push({ type: 'number', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 6. Decimal numbers (including floating types like 27.0f or raw percentages)
-                if (/[0-9]/.test(cleanCode[i])) {
-                    let end = i + 1;
-                    let hasDot = false;
-                    while (end < cleanCode.length) {
-                        if (/[0-9]/.test(cleanCode[end])) {
-                            end++;
-                        } else if (cleanCode[end] === '.' && !hasDot) {
-                            hasDot = true;
-                            end++;
-                        } else if (/[fF]/.test(cleanCode[end])) {
-                            end++; 
-                            break;
-                        } else {
-                            break;
-                        }
-                    }
-                    tokens.push({ type: 'number', val: cleanCode.substring(i, end) });
-                    i = end;
-                    continue;
-                }
-                // 7. Identifiers / Keywords / Types / Function calls
-                if (/[a-zA-Z_]/.test(cleanCode[i])) {
-                    let end = i + 1;
-                    while (end < cleanCode.length && /[a-zA-Z0-9_]/.test(cleanCode[end])) {
-                        end++;
-                    }
-                    let val = cleanCode.substring(i, end);
-                    
-                    // Peek if followed by parentheses to mark function call
-                    let isFunc = false;
-                    let peek = end;
-                    while (peek < cleanCode.length && /\s/.test(cleanCode[peek])) {
-                        peek++;
-                    }
-                    if (peek < cleanCode.length && cleanCode[peek] === '(') {
-                        isFunc = true;
-                    }
-
-                    if (keywords.has(val)) {
-                        tokens.push({ type: 'keyword', val });
-                    } else if (types.has(val)) {
-                        tokens.push({ type: 'type', val });
-                    } else if (isFunc) {
-                        tokens.push({ type: 'function', val });
-                    } else {
-                        tokens.push({ type: 'text', val });
-                    }
-                    i = end;
-                    continue;
-                }
-                // 8. Plain text / Operators / Punctuation
-                tokens.push({ type: 'text', val: cleanCode[i] });
-                i++;
+            if (isCastleRunning) {
+                adjustLegoCastleSpeed();
             }
-
-            // Convert tokens into high-quality HTML
-            return tokens.map(t => {
-                const esc = escapeHtml(t.val);
-                switch (t.type) {
-                    case 'comment':
-                        return `<span class="text-slate-500 italic">${esc}</span>`;
-                    case 'preprocessor':
-                        return `<span class="text-amber-500 font-semibold">${esc}</span>`;
-                    case 'string':
-                        return `<span class="text-emerald-400">${esc}</span>`;
-                    case 'number':
-                        return `<span class="text-cyan-400 font-mono">${esc}</span>`;
-                    case 'keyword':
-                        return `<span class="text-amber-400 font-semibold">${esc}</span>`;
-                    case 'type':
-                        return `<span class="text-rose-400 font-semibold">${esc}</span>`;
-                    case 'function':
-                        return `<span class="text-blue-400 font-semibold">${esc}</span>`;
-                    default:
-                        return esc;
-                }
-            }).join('');
         }
 
-        // SYNC LINE NUMBERS GENERATION
-        function updateLineNumbers(codeText) {
-            const lines = codeText.split('\n').length;
-            let numberString = '';
-            for (let i = 1; i <= Math.max(lines, 1); i++) {
-                numberString += i + '<br>';
-            }
-            lineNumbers.innerHTML = numberString;
-        }
+        // 城堡全系統閉迴路啟用/停用
+        function triggerLegoCastle() {
+            const btn = document.getElementById('btn-final-action');
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
 
-        // MAIN STEP RENDER FUNCTION
-        function renderStep() {
-            const step = steps[currentStepIndex];
-            
-            // 1. Text descriptions update
-            stepBadge.innerText = step.badge;
-            stepCategory.innerText = step.category;
-            stepTitle.innerText = step.title;
-            stepContent.innerHTML = step.content;
+            if (!isCastleRunning) {
+                // 啟動
+                isCastleRunning = true;
+                btn.innerHTML = '<i class="fa-solid fa-stop"></i> 停止系統運行';
+                btn.className = "w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md";
+                
+                statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                statusTxt.innerText = "城堡全力運行中";
+                statusTxt.className = "font-bold text-emerald-500";
 
-            // 2. Progress percentage
-            const percentage = ((currentStepIndex + 1) / steps.length) * 100;
-            progressBar.style.width = `${percentage}%`;
-            progressText.innerText = `${currentStepIndex + 1} / ${steps.length}`;
-
-            // 3. Navigation state
-            prevBtn.disabled = currentStepIndex === 0;
-            
-            if (currentStepIndex === steps.length - 1) {
-                nextBtn.innerHTML = `重頭開始 <i class="fa-solid fa-rotate-left"></i>`;
+                // 開始 SVG 動態動畫
+                startCastleAnimation();
             } else {
-                nextBtn.innerHTML = `下一步 <i class="fa-solid fa-chevron-right"></i>`;
+                // 停止
+                stopCastleAnimation();
             }
-
-            // 4. Update Quick Jumps Indicator
-            initStepIndicators();
-
-            // 5. Code panel render
-            renderCodeBlock();
         }
 
-        // RENDER CODE BLOCK BASED ON VIEW MODE
-        function renderCodeBlock() {
-            let activeCode = "";
-            if (isFullCodeMode) {
-                activeCode = fullSourceCode;
-                codeFileName.innerHTML = `完整主程式: <span class="text-amber-400 font-mono">main.c</span>`;
-                copyCodeBtn.innerHTML = `<i class="fa-solid fa-clone"></i> <span>複製全專案程式碼</span>`;
-            } else {
-                activeCode = steps[currentStepIndex].code;
-                codeFileName.innerHTML = `步驟 ${currentStepIndex + 1} 片段: <span class="text-rose-400 font-mono">main.c</span>`;
-                copyCodeBtn.innerHTML = `<i class="fa-solid fa-clone"></i> <span>複製此步驟程式碼</span>`;
-            }
+        // 開始動畫線路與運作
+        function startCastleAnimation() {
+            const wheel = document.getElementById('lego-spinning-wheel');
+            const cargo = document.getElementById('conveyor-cargo');
+            const brain = document.getElementById('lego-brain');
 
-            // Apply highlighters and line numbers
-            codeDisplay.innerHTML = highlightCCode(activeCode);
-            updateLineNumbers(activeCode);
+            if (wheel) wheel.classList.add('animate-wheel');
+            if (cargo) cargo.classList.add('animate-cargo');
+            if (brain) brain.classList.add('animate-brain');
+
+            adjustLegoCastleSpeed();
         }
 
-        // CLIPBOARD COPY UTILITY WITH IFRAME FALLBACK
-        function copyToClipboard(text) {
-            // Clean non-breaking spaces before copying to clipboard to prevent Keil compiler errors
-            const cleanTextForClipboard = text.replace(/\u00a0/g, ' ');
+        // 根據溫度，實時改變呼吸燈摩天輪的轉動與閃爍速度
+        function adjustLegoCastleSpeed() {
+            const wheel = document.getElementById('lego-spinning-wheel');
+            const legendDesc = document.getElementById('assembly-desc');
             
-            const textArea = document.createElement("textarea");
-            textArea.value = cleanTextForClipboard;
-            textArea.style.top = "0";
-            textArea.style.left = "0";
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+            if (!wheel) return;
 
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showToast(isFullCodeMode ? "已成功複製完整的 main.c 專案！" : `已成功複製 步驟 ${currentStepIndex + 1} 程式片段！`);
-                } else {
-                    showToast("複製失敗，請手動複製！", true);
-                }
-            } catch (err) {
-                showToast("瀏覽器不支援自動複製，請手動複製！", true);
+            if (temperatureValue > 27.0) {
+                // 快速運作
+                wheel.style.setProperty('--spin-duration', '1.5s');
+                legendDesc.innerHTML = `【智慧大腦驚醒：${temperatureValue}°C > 27°C】<br><span class="text-rose-600 font-bold">檢測到溫度過高！</span> 大腦修改 <code>g_u32BreathDiv = 5</code>。摩天輪與 LED 掛件正快速呼吸調速中，警報已發射！`;
+            } else {
+                // 慢速運作
+                wheel.style.setProperty('--spin-duration', '8s');
+                legendDesc.innerHTML = `【大腦維持休眠：${temperatureValue}°C】<br>溫度維持正常，大腦調回 <code>g_u32BreathDiv = 60</code>，並安全回到 NPD1 掉電休眠。摩天輪緩慢呼吸。`;
             }
-
-            document.body.removeChild(textArea);
         }
 
-        // SHOW CUSTOM TOAST MESSAGE
-        function showToast(message, isError = false) {
-            toastMsg.innerText = message;
-            if (isError) {
-                toast.classList.remove("border-emerald-500", "text-emerald-400");
-                toast.classList.add("border-rose-500", "text-rose-400");
-            } else {
-                toast.classList.remove("border-rose-500", "text-rose-400");
-                toast.classList.add("border-emerald-500", "text-emerald-400");
+        // 停止動畫
+        function stopCastleAnimation() {
+            isCastleRunning = false;
+            const btn = document.getElementById('btn-final-action');
+            if (btn) {
+                btn.className = "w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10";
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> 點擊啟動城堡系統';
             }
 
-            // Animation classes
-            toast.classList.remove("opacity-0", "translate-y-10", "pointer-events-none");
-            toast.classList.add("opacity-100", "translate-y-0");
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
+            if (statusDot && statusTxt) {
+                statusDot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                statusTxt.innerText = "組裝完畢 (待命)";
+                statusTxt.className = "font-bold text-amber-500";
+            }
 
-            setTimeout(() => {
-                toast.classList.remove("opacity-100", "translate-y-0");
-                toast.classList.add("opacity-0", "translate-y-10", "pointer-events-none");
-            }, 3000);
+            const wheel = document.getElementById('lego-spinning-wheel');
+            const cargo = document.getElementById('conveyor-cargo');
+            const brain = document.getElementById('lego-brain');
+
+            if (wheel) wheel.classList.remove('animate-wheel');
+            if (cargo) cargo.classList.remove('animate-cargo');
+            if (brain) brain.classList.remove('animate-brain');
+
+            const legendDesc = document.getElementById('assembly-desc');
+            if (legendDesc) {
+                legendDesc.innerText = legoAssemblyLegends[5];
+            }
         }
 
-        // EVENT LISTENERS REGISTER
-        copyCodeBtn.addEventListener("click", () => {
-            const activeCode = isFullCodeMode ? fullSourceCode : steps[currentStepIndex].code;
-            copyToClipboard(activeCode);
-        });
+        // 複製代碼工具
+        function copyCode(elementId) {
+            const codeText = document.getElementById(elementId).innerText;
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = codeText;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+        }
 
-        // Toggle code view modes
-        modeStepBtn.addEventListener("click", () => {
-            isFullCodeMode = false;
-            modeStepBtn.className = "px-2.5 py-1 rounded bg-slate-800 text-amber-400 font-semibold transition text-[10px]";
-            modeFullBtn.className = "px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 transition text-[10px]";
-            renderCodeBlock();
-        });
+        // 完成提示燈箱控制
+        function showCelebration() {
+            const modal = document.getElementById('celebrate-modal');
+            const box = document.getElementById('celebrate-box');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            box.classList.remove('scale-95');
+            box.classList.add('scale-100');
+        }
 
-        modeFullBtn.addEventListener("click", () => {
-            isFullCodeMode = true;
-            modeFullBtn.className = "px-2.5 py-1 rounded bg-slate-800 text-amber-400 font-semibold transition text-[10px]";
-            modeStepBtn.className = "px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 transition text-[10px]";
-            renderCodeBlock();
-        });
-
-        // Steps navigation handlers
-        nextBtn.addEventListener("click", () => {
-            if (currentStepIndex === steps.length - 1) {
-                currentStepIndex = 0;
-            } else {
-                currentStepIndex++;
-            }
-            renderStep();
-        });
-
-        prevBtn.addEventListener("click", () => {
-            if (currentStepIndex > 0) {
-                currentStepIndex--;
-                renderStep();
-            }
-        });
-
-        // WINDOW INITIALIZATION
-        window.onload = function() {
-            renderStep();
-        };
+        function closeModal() {
+            const modal = document.getElementById('celebrate-modal');
+            const box = document.getElementById('celebrate-box');
+            
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            box.classList.add('scale-95');
+            box.classList.remove('scale-100');
+        }
     </script>
 </body>
 </html>
