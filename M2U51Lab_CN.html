@@ -97,9 +97,9 @@
                 <div>
                     <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
                         M2U51 Lab
-                        <span class="text-xs bg-red-50 text-pulseRed border border-red-200 px-2 py-0.5 rounded-full font-semibold">智慧城堡組裝指南</span>
+                        <span class="text-xs bg-red-50 text-pulseRed border border-red-200 px-2 py-0.5 rounded-full font-semibold">M2U51 智慧溫控呼吸城堡</span>
                     </h1>
-                    <p class="text-xs text-slate-500">動態組裝概念視覺化與完整專案開發實踐</p>
+                    <p class="text-xs text-slate-500">NuDeveloper Ecosystem</p>
                 </div>
             </div>
             <!-- 組裝總進度指示 -->
@@ -694,7 +694,7 @@ SrcArray_PWM[6] = PWM_PERIOD_Value * 20 / 100;</code></pre>
 
                             <!-- 子頁面 2: RX Scatter-gather Table -->
                             <div class="space-y-2 mt-6">
-                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-950 flex items-center gap-2">
                                     <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
                                     RX Scatter-gather Table 建立
                                 </h3>
@@ -1115,7 +1115,7 @@ else
                         <input id="lego-temp-slider" type="range" min="15.0" max="40.0" step="0.5" value="25.0" oninput="updateLegoTemp(this.value)" disabled class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400">
                         
                         <!-- 動態動作按鈕 -->
-                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-not-allowed shadow-inner">
+                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10">
                             <i class="fa-solid fa-play"></i> 點擊啟動城堡系統 closed-loop
                         </button>
                         <span id="cycle-trigger-tip" class="text-[9px] text-center text-slate-400 font-semibold hidden">需解鎖步驟 5 啟動</span>
@@ -1726,9 +1726,6 @@ void AutoOperation_FunctionTest(void)
         SYS_LockReg();
     }
 
-    /* Wait for HIRC stable after NPD1 wakeup before using UART */
-    CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
-
     printf("Wakeup\n");
 
     printf("I2C0 Rx done\n");
@@ -2267,7 +2264,7 @@ int32_t main(void)
             document.body.appendChild(dummy);
             dummy.value = codeText;
             dummy.select();
-            document.execCommand("copy");
+            document.execCommand('copy');
             document.body.removeChild(dummy);
         }
 
