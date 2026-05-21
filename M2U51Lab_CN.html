@@ -329,7 +329,7 @@ SystemCoreClockUpdate();</code></pre>
 
                             <!-- 3. 設定與開啟周邊peripheral的時鐘 -->
                             <div class="space-y-2 mt-6">
-                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-950 flex items-center gap-2">
                                     <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
                                     設定與開啟周邊 peripheral 的時鐘
                                 </h3>
@@ -1077,7 +1077,7 @@ else
             </div>
         </section>
 
-        <!-- 右欄：樂高積木組裝藍圖進度 (純氧白主體) -->
+        <!-- 右欄：智慧城堡實體積木藍圖 (純氧白主體) -->
         <section class="lg:col-span-5 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <!-- 藍圖頂部 -->
             <div class="bg-logicGray p-4 border-b border-slate-200 flex justify-between items-center">
@@ -1087,21 +1087,42 @@ else
                 <span class="text-[10px] bg-red-50 text-pulseRed px-2.5 py-0.5 rounded-full border border-red-200 font-bold uppercase tracking-wider">M2U51 Blueprint</span>
             </div>
 
-            <!-- 樂高大畫布 -->
-            <div class="p-6 flex-1 flex flex-col gap-6 justify-between items-center">
+            <!-- 樂高大畫布與控制區 (重構排版：控制區移到畫布容器內) -->
+            <div class="p-6 flex-1 flex flex-col gap-6 justify-between items-center w-full">
                 
-                <!-- 樂高積木組裝展示 SVG 區域 -->
+                <!-- 智慧工廠與硬體連動畫布區域 -->
                 <div class="w-full bg-logicGray rounded-2xl border border-slate-200 p-4 flex flex-col items-center justify-center relative min-h-[300px]">
-                    <div class="absolute top-2.5 left-2.5 text-[10px] text-slate-400 font-bold tracking-wider uppercase">即時工廠外觀與硬體連動</div>
                     
-                    <!-- 互動狀態小圖章 -->
-                    <div class="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/80 backdrop-blur px-2 py-0.5 rounded border border-slate-200 text-[10px]">
-                        <span id="lego-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
-                        <span id="lego-status-txt" class="font-bold text-slate-500">規劃中</span>
+                    <!-- 頂端工廠狀態與 HMI 標題列 -->
+                    <div class="w-full flex justify-between items-center mb-3">
+                        <div class="text-[10px] text-slate-400 font-bold tracking-wider uppercase">即時工廠外觀與硬體連動</div>
+                        <!-- 互動狀態小圖章 -->
+                        <div class="flex items-center gap-1 bg-white/80 backdrop-blur px-2 py-0.5 rounded border border-slate-200 text-[10px] shadow-sm">
+                            <span id="lego-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                            <span id="lego-status-txt" class="font-bold text-slate-500">規劃中</span>
+                        </div>
+                    </div>
+
+                    <!-- 【移到畫布內】城堡終極模擬驗動 HMI 控制器 -->
+                    <div class="w-full bg-white/95 backdrop-blur border border-slate-200 p-3.5 rounded-xl flex flex-col gap-2.5 mb-4 shadow-sm relative z-10">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-thermometer text-pulseRed animate-pulse"></i> 城堡周邊溫度調控：
+                            </span>
+                            <span id="temp-display-right" class="font-bold text-pulseRed fira-code">25.0 °C</span>
+                        </div>
+                        <!-- 溫度控制桿 -->
+                        <input id="lego-temp-slider" type="range" min="15.0" max="40.0" step="0.5" value="25.0" oninput="updateLegoTemp(this.value)" disabled class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400">
+                        
+                        <!-- 動態動作按鈕 -->
+                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-not-allowed shadow-inner">
+                            <i class="fa-solid fa-play"></i> 點擊啟動城堡系統 closed-loop
+                        </button>
+                        <span id="cycle-trigger-tip" class="text-[9px] text-center text-slate-400 font-semibold hidden">需解鎖步驟 5 啟動</span>
                     </div>
 
                     <!-- SVG 工廠組裝進度主體 -->
-                    <svg class="w-full max-w-[360px] h-auto drop-shadow-md" viewBox="0 0 320 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="w-full max-w-[360px] h-auto drop-shadow-md relative z-0" viewBox="0 0 320 280" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <!-- Step 1: 綠色工廠主外觀建物 -->
                         <g id="lego-plate" class="lego-part lego-locked">
                             <!-- 樂高底板底座 -->
@@ -1243,38 +1264,13 @@ else
                     </svg>
 
                     <!-- 當前步驟組裝說明 -->
-                    <div id="assembly-legend" class="mt-4 w-full bg-white border border-slate-200 p-3 rounded-xl text-xs space-y-1">
+                    <div id="assembly-legend" class="mt-4 w-full bg-white border border-slate-200 p-3 rounded-xl text-xs space-y-1 relative z-10">
                         <div class="flex items-center gap-1.5 font-bold text-slate-800">
                             <i class="fa-solid fa-circle-info text-pulseRed"></i> 當前組裝狀態：
                         </div>
                         <p id="assembly-desc" class="text-slate-500 leading-relaxed">
                             專案簡介規劃中。請跟隨左側規格書，點選「下一步」開始組裝時脈配置。
                         </p>
-                    </div>
-                </div>
-
-                <!-- 互動控制操作盒 -->
-                <div class="w-full space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">🛠_ 藍圖互動與功能驗證</h4>
-                        <span id="cycle-trigger-tip" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200 font-medium hidden">需解鎖步驟 5 啟動</span>
-                    </div>
-
-                    <!-- 城堡終極模擬驗戰器 -->
-                    <div class="bg-logicGray p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-600 font-semibold flex items-center gap-1">
-                                <i class="fa-solid fa-thermometer text-pulseRed"></i> 城堡周邊溫度調控：
-                            </span>
-                            <span id="temp-display-right" class="font-bold text-pulseRed fira-code">25.0 °C</span>
-                        </div>
-                        <!-- 溫度控制桿 -->
-                        <input id="lego-temp-slider" type="range" min="15.0" max="40.0" step="0.5" value="25.0" oninput="updateLegoTemp(this.value)" disabled class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400">
-                        
-                        <!-- 動態動作按鈕 -->
-                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-not-allowed shadow-inner">
-                            <i class="fa-solid fa-play"></i> 點擊啟動城堡系統 closed-loop
-                        </button>
                     </div>
                 </div>
 
@@ -1981,7 +1977,7 @@ int32_t main(void)
                 }
             }
 
-            // 【重構重點】控制面板僅在步驟 5 顯示
+            // 控制面板僅在步驟 5 顯示
             const codeWindow = document.getElementById('code-window-container');
             if (step === 5) {
                 codeWindow.classList.remove('hidden');
