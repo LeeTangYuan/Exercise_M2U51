@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M2U51 Lab Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #F8FAFC; 
+        }
+        .fira-code {
+            font-family: 'Fira Code', monospace;
+        }
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #F4F5F7;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 4px;
+        }
+        /* Step transition */
+        .step-transition {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* LEGO assembly transition effects */
+        .lego-part {
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .lego-locked {
+            opacity: 0.12;
+            filter: grayscale(100%) blur(0.5px);
+            stroke-dasharray: 4, 4;
+        }
+        .lego-unlocked {
+            opacity: 1;
+            filter: grayscale(0%) blur(0px);
+            stroke-dasharray: none;
+        }
+
+        /* Conveyor belt cargo animation */
+        @keyframes cargo-flow {
+            0% { transform: translate(0, 0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translate(-50px, 25px); opacity: 0; }
+        }
+        .animate-cargo {
+            animation: cargo-flow 2s linear infinite;
+        }
+
+        /* CPU aura pulse */
+        @keyframes pulse-brain {
+            0%, 100% { filter: drop-shadow(0 0 2px rgba(213, 38, 47, 0.3)); transform: scale(1); }
+            50% { filter: drop-shadow(0 0 12px rgba(213, 38, 47, 0.8)); transform: scale(1.05); }
+        }
+        .animate-brain {
+            transform-origin: 140px 98px;
+            animation: pulse-brain 2s infinite ease-in-out;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pulseRed: '#D7262F',      /* Main color: Pulse Red */
+                        oxygenWhite: '#FFFFFF',   /* Background: Oxygen White */
+                        logicGray: '#F4F5F7',     /* Accent: Logic Gray */
+                        legoGreen: '#10b981',
+                        mcuSlate: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <header class="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-40 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-pulseRed p-2.5 rounded-xl shadow-lg shadow-red-500/10 flex items-center justify-center">
+                    <i class="fa-solid fa-cubes text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        M2U51 Lab
+                        <span class="text-xs bg-red-50 text-pulseRed border border-red-200 px-2 py-0.5 rounded-full font-semibold">M2U51 スマートブリージングキャッスル</span>
+                    </h1>
+                    <p class="text-xs text-slate-500">NuDeveloper Ecosystem</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 bg-logicGray p-2.5 rounded-xl border border-slate-200 text-xs">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-screwdriver-wrench text-slate-500"></i>
+                    <span class="text-slate-500">組み立て進捗:</span>
+                    <span id="progress-percent-badge" class="font-bold text-pulseRed fira-code">0%</span>
+                </div>
+                <div class="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div id="progress-bar-badge" class="bg-pulseRed h-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+                <div class="w-px h-4 bg-slate-200"></div>
+                <div class="flex items-center gap-1.5 text-slate-600 font-semibold">
+                    <span id="unlocked-count">0</span> / 5 部品構築済み
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <section class="lg:col-span-7 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div class="bg-logicGray border-b border-slate-200 p-4 overflow-x-auto">
+                <ul class="flex justify-between items-center relative min-w-[500px] px-2">
+                    <div class="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
+                    <div id="step-progress-line" class="absolute top-1/2 left-0 h-1 bg-pulseRed -translate-y-1/2 z-0 transition-all duration-300" style="width: 0%;"></div>
+
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(0)">
+                        <div id="step-num-0" class="w-9 h-9 rounded-full bg-pulseRed text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all shadow-lg shadow-red-500/30 scale-110">0</div>
+                        <span id="step-txt-0" class="text-[10px] mt-1 font-semibold text-pulseRed block">0. 概要</span>
+                    </li>
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(1)">
+                        <div id="step-num-1" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">1</div>
+                        <span id="step-txt-1" class="text-[10px] mt-1 font-semibold text-slate-500 block">1. クロック設定</span>
+                    </li>
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(2)">
+                        <div id="step-num-2" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">2</div>
+                        <span id="step-txt-2" class="text-[10px] mt-1 font-semibold text-slate-500 block">2. UART デバッグ</span>
+                    </li>
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(3)">
+                        <div id="step-num-3" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">3</div>
+                        <span id="step-txt-3" class="text-[10px] mt-1 font-semibold text-slate-500 block">3. 呼吸 LED</span>
+                    </li>
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(4)">
+                        <div id="step-num-4" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">4</div>
+                        <span id="step-txt-4" class="text-[10px] mt-1 font-semibold text-slate-500 block">4. 自動転送</span>
+                    </li>
+                    <li class="relative z-10 flex flex-col items-center flex-1 cursor-pointer" onclick="goToStep(5)">
+                        <div id="step-num-5" class="w-9 h-9 rounded-full bg-white text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all">5</div>
+                        <span id="step-txt-5" class="text-[10px] mt-1 font-semibold text-slate-500 block">5. 低消費電力</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+                
+                <div class="prose max-w-none">
+                    <div id="step-content-0" class="step-transition">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-red-50 text-pulseRed rounded-full border border-red-200">📋 概要</span>
+                            <span class="text-xs text-slate-500">M2U51 MCU Lab 設計図</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3">
+                            M2U51 スマートキャッスル Lab
+                        </h2>
+                        <p class="text-slate-600 leading-relaxed text-sm mb-5">
+                            この実験では、M2U51 MCU を使用してスマートシステムを構築する方法を示します。<strong class="text-pulseRed">I2C</strong> 経由で温度を読み取り、<strong class="text-pulseRed">PWM 呼吸 LED</strong> の速度を変更します。環境に優しい組み込み設計のため、読み取りの間、CPU はウルトラ低消費電力モードに移行します。
+                        </p>
+
+                        <div class="mb-5">
+                            <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1">
+                                <i class="fa-solid fa-star text-pulseRed"></i> コア機能
+                            </h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-logicGray border-b border-slate-200 text-slate-700 font-bold">
+                                            <th class="p-3 w-1/4">機能</th>
+                                            <th class="p-3">説明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-slate-600">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">温度センサー</td>
+                                            <td class="p-3">1秒ごとに I2C 経由で NCT7712Y を読み取ります (アドレス 0x48)。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">呼吸 LED</td>
+                                            <td class="p-3">Timer0 PWM が PB5 LED を駆動し、デューティサイクルを 20% から 100% に変化させます。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">スマートリンク</td>
+                                            <td class="p-3">温度 &gt; 27°C → 高速 (350ms/サイクル)、≤ 27°C → 低速 (4.2s/サイクル)。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900">低消費電力</td>
+                                            <td class="p-3">待機中は NPD1 モードでスリープします。CPU 使用率は 0.1% 未満です。</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1">
+                                <i class="fa-solid fa-microchip text-pulseRed"></i> 周辺機器の割り当て
+                            </h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-logicGray border-b border-slate-200 text-slate-700 font-bold">
+                                            <th class="p-3 w-1/4">周辺機器</th>
+                                            <th class="p-3">目的</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-slate-600">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">Timer1 (LIRC)</td>
+                                            <td class="p-3">自動 I2C 操作のための 1Hz トリガー。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">Timer0 (LIRC)</td>
+                                            <td class="p-3">100Hz PWM 出力 + 呼吸効果のための割り込み更新。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">I2C0</td>
+                                            <td class="p-3">センサーデータを読み取るためのマスター自動操作モード。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">PDMA0</td>
+                                            <td class="p-3">TX 用に CH0、RX 用に CH1 (スキャッターギャザー)。CPU 負荷はゼロです。</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-3 font-semibold text-slate-900 fira-code">UART0</td>
+                                            <td class="p-3">115200 ボーで温度とシステム状態をログ出力します。</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-logicGray rounded-xl p-4 border border-slate-200 space-y-3">
+                            <h4 class="text-xs font-bold text-pulseRed uppercase tracking-wider">💡 デザインハイライト</h4>
+                            <ul class="space-y-2 text-xs text-slate-600">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">自動 I2C 読み取り:</strong> Timer1 が I2C 自動操作をトリガー → PDMA 経由でデータが転送 → 完了時のみ CPU をウェイクアップします。</div>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">シームレスな呼吸効果:</strong> PWM ハードウェアは NPD1 スリープモードで動作します。CPU は 10ms ごとに 1 マイクロ秒だけウェイクアップし、<code>g_u32BreathDiv</code> のみを変更して次のステップをロードします。</div>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-check text-pulseRed mt-0.5"></i>
+                                    <div><strong class="text-slate-900">ウルトラスリープ:</strong> HIRC を停止し、LIRC で動作します。出力の破損を防ぐため、スリープ前に UART をフラッシュします。</div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="step-content-1" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200">🧱 ステップ 1</span>
+                            <span class="text-xs text-slate-500">クロック設定</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            クロック & 初期化 <span class="text-pulseRed font-mono text-lg font-normal">(SYS_Init)</span>
+                        </h2>
+                        
+                        <div class="space-y-6 text-sm text-slate-600 leading-relaxed mt-4">
+                            <div class="space-y-2">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
+                                    コアシステムクロックの有効化
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    高速システムクロック (HCLK) を HIRC にバインドします。保護されたレジスタのロックを解除して、クロック分配値を変更します。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step1-code-1')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step1-code-1"><code>/* 保護レジスタのロック解除 */
+SYS_UnlockReg();
+
+/* HIRC および LIRC クロックソースの有効化 */
+CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk | CLK_PWRCTL_LIRCEN_Msk);
+
+/* HIRC および LIRC クロックの準備完了を待機 */
+CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
+CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
+
+/* HCLK クロックソースを HIRC (分周比 1) に設定 */
+CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_HIRC, CLK_HCLKDIV_HCLK(1));
+
+/* PCLK0/PCLK1 を HCLK/2 に設定 */
+CLK->PCLKDIV = (CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2);
+
+/* システムコアクロックの更新 */
+SystemCoreClockUpdate();</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-950 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
+                                    周辺機器クロックの割り当て
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    HIRC がオフのパワーダウンモードでもタイマーを動作させ続けるため、Timer0 (呼吸 LED) と Timer1 (I2C トリガーソース) を LIRC に接続します。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step1-code-2')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step1-code-2"><code>/* UART0 クロックソースを HIRC (分周比 1) に設定 */
+CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL2_UART0SEL_HIRC, CLK_CLKDIV_UART0(1));
+
+/* TIMER0 クロックソースを LIRC に設定 (PWM 呼吸 LED 用、パワーダウン中も動作維持) */
+CLK_SetModuleClock(TMR0_MODULE, CLK_CLKSEL1_TMR0SEL_LIRC, MODULE_NoMsk);
+
+/* TIMER1 クロックソースを LIRC に設定 (I2C 自動操作トリガー用、パワーダウン中も動作維持) */
+CLK_SetModuleClock(TMR1_MODULE, CLK_CLKSEL1_TMR1SEL_LIRC, MODULE_NoMsk);
+
+/* 周辺機器クロックの有効化 */
+CLK_EnableModuleClock(UART0_MODULE);
+CLK_EnableModuleClock(I2C0_MODULE);
+CLK_EnableModuleClock(TMR0_MODULE);
+CLK_EnableModuleClock(TMR1_MODULE);
+CLK_EnableModuleClock(PDMA0_MODULE);
+CLK_EnableModuleClock(GPA_MODULE);
+CLK_EnableModuleClock(GPB_MODULE);
+CLK_EnableModuleClock(GPC_MODULE);</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
+                                    GPIO マッピング
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    UART0, I2C0, および Timer0 PWM 用の多機能ピンを設定します。ノイズ除去のため、I2C ピンのシュミットトリガを有効にします。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step1-code-3')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step1-code-3"><code>/*---------------------------------------------------------------------------------------------------------*/
+/* 多機能ピンの初期化                                                                                        */
+/*---------------------------------------------------------------------------------------------------------*/
+
+/* PB13 を UART0_TXD に設定 (パワーダウン中のリークを防ぐため TX のみ、RX ピンはなし) */
+SYS->GPB_MFPH = (SYS->GPB_MFPH & ~SYS_GPB_MFPH_PB13MFP_Msk) | SYS_GPB_MFPH_PB13MFP_UART0_TXD;
+
+/* PC0 を I2C0_SDA、PC1 を I2C0_SCL に設定 */
+SYS->GPC_MFPL = (SYS->GPC_MFPL & ~(SYS_GPC_MFPL_PC0MFP_Msk | SYS_GPC_MFPL_PC1MFP_Msk)) |
+                 (SYS_GPC_MFPL_PC0MFP_I2C0_SDA | SYS_GPC_MFPL_PC1MFP_I2C0_SCL);
+
+/* I2C ノイズ耐性のために PC0 と PC1 のシュミットトリガを有効化 */
+PC->SMTEN |= (GPIO_SMTEN_SMTEN0_Msk | GPIO_SMTEN_SMTEN1_Msk);
+
+/* LED 呼吸効果のために PB5 を TM0 PWM 出力に設定 */
+SYS->GPB_MFPL = (SYS->GPB_MFPL & ~SYS_GPB_MFPL_PB5MFP_Msk) | SYS_GPB_MFPL_PB5MFP_TM0;</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step-content-2" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-red-50 text-pulseRed rounded-full border border-red-200">🧱 ステップ 2</span>
+                            <span class="text-xs text-slate-500">UART0 通信</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            UART0 TX と printf ロギングの有効化 <span class="text-pulseRed font-mono text-lg font-normal">(UART0_Init)</span>
+                        </h2>
+                        
+                        <div class="space-y-6 text-sm text-slate-600 leading-relaxed mt-4">
+                            <div class="space-y-2">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
+                                    ロギング用ボーレート設定
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    デバッグメッセージを出力するために UART0 經由で <code class="bg-slate-100 px-1 py-0.5 rounded text-pulseRed">printf()</code> を使用します。周辺機器を 115200 bps でオープンします。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step2-code-1')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step2-code-1"><code>void UART0_Init(void)
+{
+    /* UART0 のリセット */
+    SYS_ResetModule(UART0_RST);
+
+    /* UART0 の設定およびボーレートの設定 */
+    UART_Open(UART0, 115200);
+}</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
+                                    省電力ピン設計
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    ディープスリープ (NPD1 モード) 中の電流リークを避けるため、TX ピン (PB13) のみを設定し、RX は未接続またはフローティング状態にします。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step-content-3" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-600 rounded-full border border-amber-200">🧱 ステップ 3</span>
+                            <span class="text-xs text-slate-500">Timer0 PWM LED</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            Timer0 PWM 呼吸 LED の実装
+                        </h2>
+                        <p class="text-sm text-slate-505 pl-1 leading-relaxed">
+                            このステップでは、<code class="bg-slate-100 px-1 rounded text-slate-800">Timer_PWM_Init()</code> と <code class="bg-slate-100 px-1 rounded text-pulseRed font-semibold">TMR0_IRQHandler()</code> を使用して、ステータスインジケータを駆動するために Timer0 を初期化します。
+                        </p>
+                        
+                        <div class="space-y-8 text-sm text-slate-600 leading-relaxed mt-6">
+                            <div class="border-t border-slate-200 pt-6 space-y-4">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
+                                    Timer0 PWM の設定
+                                </h3>
+                                
+                                <div class="bg-blue-50/75 p-3 rounded-xl border border-blue-200 pl-4 space-y-1 text-xs text-blue-800">
+                                    <div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-info"></i> クロック & ピン要件のリマインド</div>
+                                    <div>• <strong>クロックソース:</strong> LIRC (38.4kHz)、初期クロック設定時にセットアップ。</div>
+                                    <div>• <strong>出力ピン:</strong> PB5 (TM0)、GPB_MFPL マッピングを通じて割り当て。</div>
+                                </div>
+
+                                <div class="space-y-2 mt-4 pl-4">
+                                    <h4 class="font-semibold text-slate-900">1.1 Timer0 を PWM モードに切り替え、CH0 (PB5) の出力を有効にします:</h4>
+                                    <div class="relative group mt-2">
+                                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button onclick="copyCode('step3-code-1')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                                <i class="fa-regular fa-copy"></i> コピー
+                                            </button>
+                                        </div>
+                                        <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-1"><code>/* TIMER0 を PWM モードに切り替え */
+TPWM_ENABLE_PWM_MODE(TIMER0);
+
+/* CH0 (PB5) の PWM 出力を有効化 */
+TPWM_ENABLE_OUTPUT(TIMER0, TPWM_CH0);</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 mt-4 pl-4">
+                                    <h4 class="font-semibold text-slate-900">1.2 周波数を 100Hz に設定し、初期デューティ 0% (LED オフ) から開始します:</h4>
+                                    <div class="relative group mt-2">
+                                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button onclick="copyCode('step3-code-2')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                                <i class="fa-regular fa-copy"></i> コピー
+                                            </button>
+                                        </div>
+                                        <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-2"><code>/* 周波数 100Hz、初期デューティ 0% に設定 */
+TPWM_ConfigOutputFreqAndDuty(TIMER0, 100, 0);</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 mt-4 pl-4">
+                                    <h4 class="font-semibold text-slate-900">1.3 デューティサイクルのスケーリング用に実際の周期値を読み取ります (LIRC のドリフトを補正):</h4>
+                                    <div class="relative group mt-2">
+                                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button onclick="copyCode('step3-code-3')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                                <i class="fa-regular fa-copy"></i> コピー
+                                            </button>
+                                        </div>
+                                        <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-3"><code>/* レジスタから実際の周期カウントを読み取り */
+PWM_PERIOD_Value = TIMER0->PWMPERIOD + 1;</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 mt-4 pl-4">
+                                    <h4 class="font-semibold text-slate-900">1.4 スリープモード (NPD1) での Timer0 クロックとデバッガの動作を設定します:</h4>
+                                    <div class="relative group mt-2">
+                                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button onclick="copyCode('step3-code-4')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                                <i class="fa-regular fa-copy"></i> コピー
+                                            </button>
+                                        </div>
+                                        <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-4"><code>/* パワーダウンエンジンのクロックを有効化 */
+TIMER0->CTL |= TIMER_CTL_PDCLKEN_Msk;
+
+/* デバッグモード中も PWM をアクティブに維持 */
+SYS_UnlockReg();
+TIMER0->PWMCTL |= TIMER_PWMCTL_DBGTRIOFF_Msk;
+SYS_LockReg();</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 mt-4 pl-4">
+                                    <h4 class="font-semibold text-slate-900">1.5 10ms (100Hz) ごとに ISR をトリガーするためのアキュムレータとウェイクアップ設定を行います:</h4>
+                                    <div class="relative group mt-2">
+                                        <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button onclick="copyCode('step3-code-5')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                                <i class="fa-regular fa-copy"></i> コピー
+                                            </button>
+                                        </div>
+                                        <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-5"><code>/* アキュムレータを有効化: IFACNT=0 は 1 周期ごとに実行を意味する (100Hz PWM で毎秒 100 回の ISR) */
+TPWM_EnableAcc(TIMER0, 0, TPWM_IFA_PERIOD_POINT);
+
+/* アキュムレータ割り込みを有効化 (ソフトウェア分周器が呼吸速度を制御) */
+TPWM_EnableAccInt(TIMER0);
+NVIC_EnableIRQ(TMR0_IRQn);
+
+/* TMR0 ISR が NPD1 から CPU をウェイクアップして PWMCMPDAT を更新できるよう、TPWM 割り込みウェイクアップを有効化 */
+TPWM_EnableWakeup(TIMER0);</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 pt-6 space-y-4">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
+                                    TMR0_IRQHandler ISR (割り込みサービスルーチン)
+                                </h3>
+                                <p class="text-slate-600 pl-4">
+                                    10ms の割り込みごとに <code class="bg-slate-100 px-1 rounded text-pulseRed font-semibold">g_u32BreathCnt</code> がインクリメントされます。それが <code class="bg-slate-100 px-1 rounded text-slate-900 font-semibold">g_u32BreathDiv</code> に達すると、次の輝度値に移行し、スムーズなパルス出力を生成します。
+                                </p>
+                                <div class="relative group pl-4">
+                                    <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button onclick="copyCode('step3-code-6')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                            <i class="fa-regular fa-copy"></i> コピー
+                                        </button>
+                                    </div>
+                                    <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-6"><code>void TMR0_IRQHandler(void)
+{
+    /* ウェイクアップフラグのクリア (NPD1 からの復帰時に必要) */
+    TPWM_ClearWakeupFlag(TIMER0);
+
+    if (TIMER0->PWMAINTSTS & TIMER_PWMAINTSTS_IFAIF_Msk)
+    {
+        /* アキュムレータ割り込みフラグのクリア */
+        TIMER0->PWMAINTSTS = TIMER_PWMAINTSTS_IFAIF_Msk;
+
+        if (++g_u32BreathCnt >= g_u32BreathDiv)
+        {
+            g_u32BreathCnt = 0;
+            TIMER0->PWMCMPDAT = SrcArray_PWM[g_u32PWMIdx];
+            g_u32PWMIdx = (g_u32PWMIdx + 1) % PWM_PDMA_LENGTH;
+        }
+    }
+}</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 pt-6 space-y-4">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
+                                    デューティサイクルテーブルの初期化
+                                </h3>
+                                <p class="text-slate-600 pl-4">
+                                    <code class="bg-slate-100 px-1 rounded">main()</code> 内で、ハードウェアの周期カウントを使用してテーブルを初期化し、ステップを生成します: 20% &harr; 40% &harr; 80% &harr; 100% &harr; 80% &harr; 40% &harr; 20%。
+                                </p>
+                                <div class="relative group pl-4">
+                                    <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button onclick="copyCode('step3-code-7')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                            <i class="fa-regular fa-copy"></i> コピー
+                                        </button>
+                                    </div>
+                                    <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step3-code-7"><code>/* PWM 呼吸デューティテーブルの構築: PWM 周期の 20%->40%->80%->100%->80%->40%->20% */
+SrcArray_PWM[0] = PWM_PERIOD_Value * 20 / 100;
+SrcArray_PWM[1] = PWM_PERIOD_Value * 40 / 100;
+SrcArray_PWM[2] = PWM_PERIOD_Value * 80 / 100;
+SrcArray_PWM[3] = PWM_PERIOD_Value * 100 / 100;
+SrcArray_PWM[4] = PWM_PERIOD_Value * 80 / 100;
+SrcArray_PWM[5] = PWM_PERIOD_Value * 40 / 100;
+SrcArray_PWM[6] = PWM_PERIOD_Value * 20 / 100;</code></pre>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div id="step-content-4" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">🧱 ステップ 4</span>
+                            <span class="text-xs text-slate-500">I2C0 + PDMA 転送リンク</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            自動化された I2C 転送
+                        </h2>
+                        
+                        <div class="space-y-6 text-sm text-slate-600 leading-relaxed mt-4">
+                            <p>
+                                自動化されたデータコンベアを設定します: <strong class="text-pulseRed font-semibold">Timer1 が 1Hz でオーバーフロー → ハードウェアが自動的に I2C0 をトリガー → PDMA が温度データを転送。</strong>
+                            </p>
+                            <p class="bg-red-50/50 p-3 rounded-xl border border-red-100 text-xs">
+                                <strong>💡 ブロックアーキテクチャ:</strong> このリンクは3つの部分で構成されています: センサーにコマンドを書き込むための <strong>TX テーブル</strong>、受信した値を保持する <strong>RX テーブル</strong>、およびプロセスを定期的にトリガーする <strong>Timer1</strong> の設定です。
+                            </p>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
+                                    TX スキャッターギャザーテーブルの構築
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    TX リストは、コマンド <code class="bg-slate-100 px-1 py-0.5 rounded text-pulseRed">[SLV+W, レジスタアドレス, SLV+R]</code> を I2C にロードします。最後のエントリは最初 (<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800 fira-code">DMA_DESC_SC_TX[0]</code>) に戻るようにリンクされているため、CPU の介入なしで無限にループします。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step4-code-1')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step4-code-1"><code>void Build_Tx_SCTab(uint32_t u32TabNum, uint32_t u32TxSize, uint32_t u32StartAddr)
+{
+    uint32_t i;
+
+    for (i = 0; i < u32TabNum; i++)
+    {
+        DMA_DESC_SC_TX[i].ctl = PDMA_OP_SCATTER |
+                                PDMA_REQ_SINGLE |
+                                PDMA_DAR_FIX |
+                                PDMA_SAR_INC |
+                                PDMA_WIDTH_8 |
+                                PDMA_TBINTDIS_DISABLE |
+                                ((u32TxSize - 1) << PDMA_DSCT_CTL_TXCNT_Pos);
+        DMA_DESC_SC_TX[i].src    = (uint32_t)(u32StartAddr + i * u32TxSize);
+        DMA_DESC_SC_TX[i].dest   = (uint32_t)&(I2C0->DAT);
+        DMA_DESC_SC_TX[i].offset = (uint32_t)&DMA_DESC_SC_TX[0] - SG_BASE_ADDR;
+    }
+}</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-950 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
+                                    RX スキャッターギャザーテーブル의構築
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    5 組の読み取り値 (計 10 バイト) を取得します。最後の記述子は <strong class="text-pulseRed font-semibold">オフセット 0 の BASIC モード</strong> に設定されます。これによりプロセスが停止し、CPU に「データの読み取りが完了しました！」と通知されます。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step4-code-2')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step4-code-2"><code>void Build_Rx_SCTab(uint32_t u32TabNum, uint32_t u32RxSize, uint32_t u32StartAddr)
+{
+    uint32_t i;
+
+    for (i = 0; i < u32TabNum; i++)
+    {
+        DMA_DESC_SC_RX[i].ctl = PDMA_OP_SCATTER |
+                                PDMA_REQ_SINGLE |
+                                PDMA_SAR_FIX |
+                                PDMA_DAR_INC |
+                                PDMA_WIDTH_8 |
+                                PDMA_TBINTDIS_DISABLE |
+                                ((u32RxSize - 1) << PDMA_DSCT_CTL_TXCNT_Pos);
+        DMA_DESC_SC_RX[i].src    = (uint32_t)&(I2C0->DAT);
+        DMA_DESC_SC_RX[i].dest   = (uint32_t)(u32StartAddr + i * u32RxSize);
+        DMA_DESC_SC_RX[i].offset = (uint32_t)&DMA_DESC_SC_RX[0] + 0x10 * (i + 1) - (PDMA0->SCATBA);
+    }
+
+    /* 最後のエントリ用: 転送完了割り込みを有効にし、ベーシックモードに切り替え */
+    DMA_DESC_SC_RX[u32TabNum - 1].ctl = (DMA_DESC_SC_RX[u32TabNum - 1].ctl & ~(PDMA_DSCT_CTL_TBINTDIS_Msk | PDMA_DSCT_CTL_OPMODE_Msk)) |
+                                        (PDMA_TBINTDIS_ENABLE | PDMA_OP_BASIC);
+    DMA_DESC_SC_RX[u32TabNum - 1].offset = 0;
+}</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
+                                    I2C 自動操作トリガーの設定
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    I2C 自動操作モードを Timer1 の定期的な 1Hz オーバーフローにリンクします。これにより、メインシステムをウェイクアップすることなく、バックグラウンドで完全にシリアル通信が処理されます。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step4-code-3')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step4-code-3"><code>void I2C_Trigger_Init(uint32_t u32Mode, uint32_t u32Src, uint32_t u32RxCnt, uint32_t u32TxCnt)
+{
+    /* 自動操作モードの設定 */
+    I2C0->AUTOCTL = (I2C0->AUTOCTL & ~I2C_AUTOCTL_AUTOMODE_Msk) | (u32Mode);
+
+    /* トリガーソースの選択 */
+    I2C0->AUTOCTL = (I2C0->AUTOCTL & ~I2C_AUTOCTL_TGSRCSEL_Msk) | (u32Src);
+
+    I2C0->AUTOCNT = (I2C0->AUTOCNT & ~(I2C_AUTOCNT_RXCNT_Msk | I2C_AUTOCNT_TXCNT_Msk));
+
+    if (u32RxCnt != 0)
+        I2C0->AUTOCNT |= ((u32RxCnt - 1) << I2C_AUTOCNT_RXCNT_Pos);
+
+    if (u32TxCnt != 0)
+        I2C0->AUTOCNT |= ((u32TxCnt - 1) << I2C_AUTOCNT_TXCNT_Pos);
+
+    I2C0->AUTOCTL |= I2C_AUTOCTL_TRGEN_Msk;
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step-content-5" class="step-transition hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-2.5 py-1 text-xs font-bold bg-slate-100 text-slate-700 rounded-full border border-slate-200">🧱 ステップ 5</span>
+                            <span class="text-xs text-slate-500">低消費電力の統合</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-950 mb-3 flex items-center gap-2">
+                            パワーダウン制御 & メインループ <span class="text-pulseRed font-mono text-lg font-normal">(AutoOperation_FunctionTest)</span>
+                        </h2>
+                        
+                        <div class="space-y-6 text-sm text-slate-600 leading-relaxed mt-4">
+                            <div class="space-y-2">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
+                                    I2C バッファのフォーマット
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    コマンドバッファ内のターゲットアドレスとレジスタマーカーをフォーマットします:
+                                </p>
+                                <ul class="list-disc pl-12 space-y-1 text-xs text-slate-500">
+                                    <li><code class="text-pulseRed font-mono">SrcArray[0] = ((g_u8DeviceAddr &lt;&lt; 1) | 0x00)</code> (SLV + W)</li>
+                                    <li><code class="text-pulseRed font-mono">SrcArray[1] = 0x00</code> (センサー温度レジスタインデックス)</li>
+                                    <li><code class="text-pulseRed font-mono">SrcArray[2] = ((g_u8DeviceAddr &lt;&lt; 1) | 0x01)</code> (SLV + R)</li>
+                                </ul>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-1')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-1"><code>for (i = 0; i &lt; SG_TX_TAB_NUM; i++)
+{
+    *pu8Tmp++ = ((g_u8DeviceAddr &lt;&lt; 1) | 0x00);   /* SLV + W (0x00) */
+    *pu8Tmp++ = 0x00;                              /* レジスタアドレス */
+    *pu8Tmp++ = ((g_u8DeviceAddr &lt;&lt; 1) | 0x01);   /* SLV + R (0x01) */
+}</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
+                                    コールバックハンドラの割り当て
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    バス状態コールバックポインタを <code class="bg-slate-100 px-1 rounded text-pulseRed">I2C_PDMA_MasterRx</code> に向けます。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-2')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-2"><code>/* マスター受信操作のための I2C0 割り込みコールバックを設定 */
+s_I2C0HandlerFn = (I2C_FUNC)I2C_PDMA_MasterRx;
+I2C_SET_CONTROL_REG(I2C0, I2C_CTL_AA);</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-950 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
+                                    DMA チャネルの設定
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    スキャッターギャザー制御リストをハードウェア転送パイプラインに直接マッピングします:
+                                </p>
+                                <ul class="list-disc pl-12 space-y-1 text-xs text-slate-500">
+                                    <li><strong>CH0 (TX):</strong> コマンドを継続的に転送する循環リストを実行します。</li>
+                                    <li><strong>CH1 (RX):</strong> 5 組の読み取り値を受信します。最後の動作で BASIC モードをアサートし、完了割り込みを発生させます。</li>
+                                </ul>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-3')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-3"><code>/* スレーブにデータを書き込むための PDMA CH0 スキャッターギャザーモード */
+PDMA_TX_Init(I2C0_PDMA_TX_CH, SG_TX_TAB_NUM, SG_TX_LENGTH);
+
+/* スレーブからデータを受信するための PDMA CH1 スキャッターギャザーモード */
+PDMA_RX_Init(I2C0_PDMA_RX_CH, SG_RX_TAB_NUM, SG_RX_LENGTH);</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">4</span>
+                                    自動操作の初期化
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    Timer1 の定期的なクロック出力でトリガーするように自動 I2C パラメータを設定します。
+                                </p>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-4')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-4"><code>/* TIMER1 によってトリガーされる、リピートスタート付き自動操作ランダム読み取りモード */
+I2C_Trigger_Init(I2C_RANDOM_REPEAT_STA, I2C_AUTOCTL_TRIGSEL_TMR1, SG_RX_LENGTH, SG_TX_LENGTH);</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">5</span>
+                                    ディープスリープモード (NPD1) の設定
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    コアクロックを停止するために <code class="bg-slate-100 px-1 rounded">CLK_PowerDown()</code> を呼び出します。CPU は周辺機器の処理を待つ間スリープします。
+                                </p>
+                                <div class="bg-logicGray p-4 rounded-xl border border-slate-200 space-y-3 pl-7 text-xs text-slate-700">
+                                    <div class="font-bold text-slate-900 flex items-center gap-1.5"><i class="fa-solid fa-bed text-pulseRed"></i> NPD1 スリープの仕組み:</div>
+                                    <ul class="list-disc pl-5 space-y-2 leading-relaxed">
+                                        <li><strong>HIRC が停止 &rarr;</strong> CPU、PDMA、および UART がサスペンドします。電流消費が大幅に低下します。</li>
+                                        <li><strong>LIRC がアクティブ &rarr;</strong> Timer0 が PWM LED をパルス駆動し、Timer1 が定期的にカウントします。</li>
+                                        <li><strong>★ ウェイクアップ 1: Timer0 アキュムレータ (10ms ごと):</strong>
+                                            <ul class="list-circle pl-5 mt-1 space-y-1">
+                                                <li>CPU が短時間ウェイクアップして <code class="text-pulseRed">TMR0_IRQHandler</code> を実行し、LED の輝度を更新します。</li>
+                                                <li><code class="font-mono">PDMA_DONE</code> をチェックします。まだ 0 であるため、CPU はすぐにスリープに戻ります。</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>★ ウェイクアップ 2: Timer1 タイムアウト (1秒ごと):</strong>
+                                            <ul class="list-circle pl-5 mt-1 space-y-1">
+                                                <li>Timer1 がオーバーフローし、I2C 自動操作を直接開始します。CPU はスリープ状態を維持します。</li>
+                                                <li>バス処理が完了します: <code class="text-slate-500 font-mono">START &rarr; SLA+W &rarr; REG &rarr; Repeat START &rarr; SLA+R &rarr; READ &rarr; STOP</code>。</li>
+                                                <li>PDMA が読み取ったデータをメモリに移動します。</li>
+                                                <li>最後の読み取りが割り込みをトリガーします。<code class="text-pulseRed">PDMA0_IRQHandler</code> を実行し、<code class="font-mono text-pulseRed">PDMA_DONE = 1</code> に設定して、CPU を完全にウェイクアップさせてデータを処理します。</li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-5')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-5"><code>SYS_UnlockReg();
+CLK_SetPowerDownMode(CLK_PMUCTL_PDMSEL_NPD1);
+CLK->PMUCTL = (CLK->PMUCTL & ~(CLK_PMUCTL_PDLDCSEL_Msk)) | CLK_PMUCTL_PDLDCSEL_ULP;
+
+while (!PDMA_DONE)
+{
+    /* ウェイクアップフラグのクリア */
+    CLK->PMUSTS |= CLK_PMUSTS_CLRWK_Msk;
+
+    /* UART 破損の防止 */
+    UART_WAIT_TX_EMPTY(UART0);
+
+    /* CPU & HIRC はここでサスペンドされます */
+    CLK_PowerDown();
+}
+SYS_LockReg();</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">6</span>
+                                    温度読み取り値のパース
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    取得した 5 組の読み取り値 (各 2 バイト、MSB および LSB) をデコードします:
+                                </p>
+                                <div class="bg-slate-100 text-slate-800 p-3 rounded-xl border border-slate-200 text-xs font-mono ml-7">
+                                    raw = (DestArray[i] &lt;&lt; 8 | DestArray[i+1]) &gt;&gt; 4; (12ビット)<br>
+                                    if (raw &amp; 0x800) &rarr; 負の値: 2の補数 &times; -0.0625f;<br>
+                                    else             &rarr; 正の値: &times; 0.0625f;
+                                </div>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-6')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-6"><code>for (i = 0; i &lt; SG_RX_TAB_NUM * 2; i += 2)
+{
+    NCT7712Y_Data  = DestArray[i];
+    NCT7712Y_Data &lt;&lt;= 8;
+    NCT7712Y_Data |= DestArray[i + 1];
+    NCT7712Y_Data &gt;&gt;= 4;
+
+    if (NCT7712Y_Data &amp; 0x800)
+    {
+        /* 負の温度変換 */
+        NCT7712Y_Data = ~NCT7712Y_Data &amp; 0x00000FFF;
+        NCT7712Y_Data += 1;
+        NCT7712Y_Data_F = (float)(NCT7712Y_Data * -0.0625f);
+    }
+    else
+    {
+        /* 正の温度変換 */
+        NCT7712Y_Data_F = (float)(NCT7712Y_Data * 0.0625f);
+    }
+    printf("Current Temperature = %.4f degrees Celsius.\n", NCT7712Y_Data_F);
+}</code></pre>
+                            </div>
+
+                            <div class="space-y-2 mt-6">
+                                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="bg-pulseRed text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">7</span>
+                                    呼吸速度の変更
+                                </h3>
+                                <p class="text-slate-600 pl-7">
+                                    温度に基づいてグローバルソフトウェア分周変数 <code class="bg-slate-100 px-1 rounded text-pulseRed font-mono">g_u32BreathDiv</code> を変更します。次の 10ms 割り込みで即座に適用され、シームレスに移行します。
+                                </p>
+                                <ul class="list-disc pl-12 space-y-1 text-xs text-slate-500">
+                                    <li><strong class="text-rose-600">温度 &gt; 27°C &rarr;</strong> <code class="font-mono">g_u32BreathDiv = 5</code> (高速呼吸: 350ms/サイクル)</li>
+                                    <li><strong>温度 &le; 27°C &rarr;</strong> <code class="font-mono">g_u32BreathDiv = 60</code> (低速呼吸: 4.2s/サイクル)</li>
+                                </ul>
+                            </div>
+
+                            <div class="relative group pl-7">
+                                <div class="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="copyCode('step5-code-7')" class="bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1 shadow-md">
+                                        <i class="fa-regular fa-copy"></i> コピー
+                                    </button>
+                                </div>
+                                <pre class="bg-logicGray p-4 rounded-xl border border-slate-200 overflow-x-auto text-xs text-slate-800 fira-code font-mono" id="step5-code-7"><code>if (NCT7712Y_Data_F &gt; 27.0f)
+{
+    g_u32BreathDiv = 5;    /* 高速 (分周比: 5) */
+    printf("Fast breathing\n");
+}
+else
+{
+    g_u32BreathDiv = 60;   /* 低速 (分周比: 60) */
+    printf("Slow breathing\n");
+}</code></pre>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div id="code-window-container" class="bg-logicGray rounded-2xl border border-slate-200 overflow-hidden flex flex-col transition-all duration-300 hidden">
+                    
+                    <div class="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none" onclick="toggleCodeCollapse()">
+                        <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <i id="code-collapse-icon" class="fa-solid fa-chevron-down transition-transform duration-200"></i>
+                            <span>完全な main.c プロジェクトコード</span>
+                        </span>
+                        <span id="code-collapse-status" class="text-[10px] text-slate-500 font-semibold bg-white px-2 py-0.5 rounded border border-slate-200">クリックで切り替え</span>
+                    </div>
+
+                    <div id="code-window-body" class="flex flex-col transition-all duration-300 ease-in-out opacity-100 max-h-[1000px] overflow-hidden">
+                        <div class="border-b border-slate-200 px-4 py-2 bg-slate-50 flex justify-between items-center gap-2">
+                            <div class="relative">
+                                <input id="code-search-input" type="text" placeholder="main.c 内を検索..." oninput="searchInCode()" class="pl-7 pr-3 py-1 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-pulseRed focus:border-pulseRed w-44">
+                                <i class="fa-solid fa-search text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px]"></i>
+                            </div>
+                            <button onclick="copyCode('full-code-content')" class="bg-white hover:bg-slate-50 text-[10px] text-slate-700 px-3 py-1 rounded border border-slate-200 flex items-center gap-1 shadow-sm transition-colors font-medium">
+                                <i class="fa-regular fa-copy"></i> コード全体をコピー
+                            </button>
+                        </div>
+
+                        <div id="code-container-full" class="flex flex-col bg-slate-900 overflow-hidden max-h-[380px] relative group">
+                            <div class="flex-1 overflow-y-auto custom-scrollbar flex">
+                                <div id="line-numbers" class="p-4 pr-2 text-right select-none text-slate-600 font-mono text-[11px] border-r border-slate-800 bg-slate-950/40 min-w-[3.5rem] fira-code">
+                                </div>
+                                <pre class="p-4 flex-1 overflow-x-auto text-[11px] text-slate-300 fira-code"><code id="full-code-content" class="block whitespace-pre"></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="bg-logicGray border-t border-slate-200 p-4 flex justify-between items-center">
+                <button id="prevBtn" onclick="changeStep(-1)" class="px-5 py-2 rounded-xl text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-sm">
+                    <i class="fa-solid fa-arrow-left"></i> 戻る
+                </button>
+                <button id="nextBtn" onclick="changeStep(1)" class="px-6 py-2 rounded-xl text-white bg-pulseRed hover:bg-red-700 shadow-lg shadow-red-500/10 text-sm font-semibold flex items-center gap-2 transition-all">
+                    次へ <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <section class="lg:col-span-5 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div class="bg-logicGray p-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-cubes text-pulseRed"></i> ハードウェアプレビューパネル
+                </h3>
+                <span class="text-[10px] bg-red-50 text-pulseRed px-2.5 py-0.5 rounded-full border border-red-200 font-bold uppercase tracking-wider">M2U51 設計図</span>
+            </div>
+
+            <div class="p-6 flex-1 flex flex-col gap-6 justify-between items-center w-full">
+                
+                <div class="w-full bg-logicGray rounded-2xl border border-slate-200 p-4 flex flex-col items-center justify-center relative min-h-[300px]">
+                    
+                    <div class="w-full flex justify-between items-center mb-3">
+                        <div class="text-[10px] text-slate-400 font-bold tracking-wider uppercase">実機同期プレビュー</div>
+                        <div class="flex items-center gap-1 bg-white/80 backdrop-blur px-2 py-0.5 rounded border border-slate-200 text-[10px] shadow-sm">
+                            <span id="lego-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                            <span id="lego-status-txt" class="font-bold text-slate-500">計画中</span>
+                        </div>
+                    </div>
+
+                    <div class="w-full bg-white/95 backdrop-blur border border-slate-200 p-3.5 rounded-xl flex flex-col gap-2.5 mb-4 shadow-sm relative z-10">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-thermometer text-pulseRed animate-pulse"></i> 目標温度:
+                            </span>
+                            <span id="temp-display-right" class="font-bold text-pulseRed fira-code">25.0 °C</span>
+                        </div>
+                        <input id="lego-temp-slider" type="range" min="15.0" max="40.0" step="0.5" value="25.0" oninput="updateLegoTemp(this.value)" disabled class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400">
+                        
+                        <button id="btn-final-action" onclick="triggerLegoCastle()" disabled class="w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10">
+                            <i class="fa-solid fa-play"></i> キャッスルクローズドループ開始
+                        </button>
+                        <span id="cycle-trigger-tip" class="text-[9px] text-center text-slate-400 font-semibold hidden">開始するにはステップ5をアンロックしてください</span>
+                    </div>
+
+                    <svg class="w-full max-w-[360px] h-auto drop-shadow-md relative z-0" viewBox="0 0 320 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <g id="lego-plate" class="lego-part lego-locked">
+                            <polygon points="20,210 160,260 300,210 160,160" fill="#E2F4EE" stroke="#A7F3D0" stroke-width="1.5"/>
+                            
+                            <polygon points="110,185 160,210 160,245 110,220" fill="#047857" stroke="#065F46" stroke-width="1.5"/>
+                            <polygon points="160,210 210,185 210,220 160,245" fill="#10B981" stroke="#059669" stroke-width="1.5"/>
+                            
+                            <polygon points="110,185 160,160 160,210" fill="#065F46" stroke="#047857" stroke-width="1"/>
+                            <polygon points="160,160 210,185 160,210" fill="#34D399" stroke="#059669" stroke-width="1"/>
+                            
+                            <rect x="122" y="148" width="8" height="22" fill="#047857" stroke="#065F46"/>
+                            <polygon points="122,148 126,145 130,148" fill="#34D399"/>
+                            
+                            <polygon points="150,225 170,235 170,250 150,240" fill="#1E293B"/>
+                            
+                            <text x="160" y="268" fill="#064E3B" font-size="8" text-anchor="middle" font-weight="bold" class="fira-code">M2U51 スマートファクトリー</text>
+                        </g>
+
+                        <g id="lego-uart" class="lego-part lego-locked">
+                            <path d="M 125 205 Q 60 200 65 140" stroke="#0284C7" stroke-width="1.5" stroke-dasharray="3,3" fill="none"/>
+                            
+                            <line x1="42" y1="142" x2="58" y2="126" stroke="#0284C7" stroke-width="4.5" stroke-linecap="round"/>
+                            <line x1="42" y1="142" x2="58" y2="126" stroke="#38BDF8" stroke-width="1.5" stroke-linecap="round"/>
+                            
+                            <circle cx="68" cy="116" r="14" fill="#F0F9FF" fill-opacity="0.8" stroke="#0284C7" stroke-width="2.5"/>
+                            <line x1="60" y1="116" x2="76" y2="116" stroke="#38BDF8" stroke-width="1" stroke-linecap="round"/>
+                            <line x1="68" y1="108" x2="68" y2="124" stroke="#38BDF8" stroke-width="1" stroke-linecap="round"/>
+                            
+                            <path d="M 60 110 Q 68 102 74 110" stroke="#0284C7" stroke-width="1" stroke-opacity="0.35" fill="none"/>
+                            <text x="68" y="94" fill="#0369A1" font-size="8" text-anchor="middle" font-weight="bold">UART0 TX</text>
+                        </g>
+
+                        <g id="lego-wheel" class="lego-part lego-locked">
+                            <path d="M 195 205 Q 255 200 255 152" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="3,3" fill="none"/>
+                            
+                            <rect x="238" y="140" width="34" height="8" rx="2" fill="#475569" stroke="#1E293B" stroke-width="1.5"/>
+                            <path d="M 243 140 L 243 125 M 255 140 L 255 122 M 267 140 L 267 125" stroke="#94A3B8" stroke-width="1"/>
+                            
+                            <path d="M 242 140 C 242 121 268 121 268 140 Z" fill="#D7262F" stroke="#991B1B" stroke-width="1.5" id="siren-dome-breathing"/>
+                            
+                            <circle cx="255" cy="130" r="17" stroke="#D7262F" stroke-width="1.5" stroke-dasharray="2,4" fill="none" class="animate-pulse" id="siren-rays"/>
+                            
+                            <text x="255" y="106" fill="#991B1B" font-size="8" text-anchor="middle" font-weight="bold">Timer0 PWM LED</text>
+                        </g>
+
+                        <g id="lego-conveyor" class="lego-part lego-locked">
+                            <rect x="250" y="20" width="22" height="46" rx="4" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+                            <rect x="258" y="24" width="6" height="30" rx="3" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+                            <circle cx="261" cy="54" r="5" fill="#D7262F"/>
+                            <rect x="260" y="34" width="2" height="20" fill="#D7262F" id="thermometer-mercury"/>
+                            <line x1="253" y1="28" x2="256" y2="28" stroke="#64748B" stroke-width="1"/>
+                            <line x1="253" y1="34" x2="256" y2="34" stroke="#64748B" stroke-width="1"/>
+                            <line x1="253" y1="40" x2="256" y2="40" stroke="#64748B" stroke-width="1"/>
+                            <line x1="253" y1="46" x2="256" y2="46" stroke="#64748B" stroke-width="1"/>
+                            <text x="261" y="14" fill="#B45309" font-size="7" font-weight="bold" text-anchor="middle">NCT7712Y</text>
+
+                            <path d="M 250 43 L 210 43" stroke="#EAB308" stroke-width="1.5" stroke-dasharray="2,2" fill="none"/>
+
+                            <polygon points="145,95 220,58 220,72 145,109" fill="#475569" stroke="#334155" stroke-width="1.5"/>
+                            <circle cx="152" cy="98" r="4.5" fill="#1E293B"/>
+                            <circle cx="212" cy="65" r="4.5" fill="#1E293B"/>
+                            <polygon points="145,95 220,58 220,62 145,99" fill="#1E293B"/>
+
+                            <g id="conveyor-cargo" class="">
+                                <polygon points="180,67 190,62 200,67 190,72" fill="#F87171"/>
+                                <polygon points="180,67 180,77 190,82 190,72" fill="#EF4444"/>
+                                <polygon points="190,72 190,82 200,77 200,67" fill="#DC2626"/>
+                                <text x="190" y="76" fill="#FFFFFF" font-size="6" font-weight="bold" text-anchor="middle" class="fira-code">T</text>
+                            </g>
+                            
+                            <text x="180" y="44" fill="#475569" font-size="8" text-anchor="middle" font-weight="bold">I2C PDMA ベルト</text>
+                        </g>
+
+                        <g id="lego-brain" class="lego-part lego-locked">
+                            <path d="M 140 120 L 140 168" stroke="#D7262F" stroke-width="1.5" stroke-dasharray="2,3" fill="none"/>
+                            
+                            <rect x="119" y="86" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="119" y="94" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="119" y="102" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="119" y="110" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="156" y="86" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="156" y="94" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="156" y="102" width="5" height="3" fill="#94A3B8" rx="1"/>
+                            <rect x="156" y="110" width="5" height="3" fill="#94A3B8" rx="1"/>
+
+                            <rect x="123" y="78" width="34" height="42" rx="3" fill="#1E293B" stroke="#0F172A" stroke-width="2"/>
+                            <circle cx="129" cy="84" r="1.5" fill="#D7262F"/>
+                            <text x="140" y="96" fill="#F8FAFC" font-size="7" font-weight="bold" text-anchor="middle" class="fira-code">M2U51</text>
+                            <text x="140" y="106" fill="#D7262F" font-size="6" font-weight="bold" text-anchor="middle" class="fira-code">MCU</text>
+                            
+                            <circle cx="140" cy="99" r="16" stroke="#D7262F" stroke-width="1" stroke-dasharray="1,3" fill="none" class="animate-ping" style="animation-duration: 2s;"/>
+
+                            <text x="140" y="68" fill="#991B1B" font-size="8" text-anchor="middle" font-weight="bold">CPU コア (NPD1)</text>
+                        </g>
+                    </svg>
+
+                    <div id="assembly-legend" class="mt-4 w-full bg-white border border-slate-200 p-3 rounded-xl text-xs space-y-1 relative z-10">
+                        <div class="flex items-center gap-1.5 font-bold text-slate-800">
+                            <i class="fa-solid fa-circle-info text-pulseRed"></i> 現在の組み立てステータス:
+                        </div>
+                        <p id="assembly-desc" class="text-slate-500 leading-relaxed">
+                            プロジェクト概要の設定。「次へ」をクリックしてハードウェアクロックの組み立てを開始します。
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <div id="celebrate-modal" class="fixed inset-0 bg-slate-950/40 backdrop-blur flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 text-center space-y-6 shadow-2xl scale-95 transition-all" id="celebrate-box">
+            <div class="w-20 h-20 bg-red-50 border-2 border-pulseRed rounded-full flex items-center justify-center mx-auto animate-bounce">
+                <i class="fa-solid fa-trophy text-pulseRed text-3xl"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-2xl font-bold text-slate-950">🎉 システム構築が完了しました！</h3>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    ベースシャーシ、デバッグ診断用レンズ、PWM インジケータバルブ、ハードウェア自動バス、および低消費電力制御ユニットの組み立てに成功しました！
+                </p>
+            </div>
+            <div class="bg-logicGray p-4 rounded-xl border border-slate-200 text-left space-y-2 text-xs text-slate-600 fira-code">
+                <div class="flex items-center gap-1.5 text-pulseRed font-bold">
+                    <i class="fa-solid fa-circle-check"></i> ハードウェア仕様書 (main.c)
+                </div>
+                <div>• HCLK ソース: HIRC (48MHz)</div>
+                <div>• Timer0 ベース: LIRC (38.4kHz)</div>
+                <div>• DMA 設定: 5記述子ループチェーン</div>
+                <div>• スマートパワーダウン有効: ウェイクアップ & スリープ</div>
+            </div>
+            <button onclick="closeModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-pulseRed to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold text-sm shadow-lg shadow-red-500/20 transition-all">
+                ガイドに戻る
+            </button>
+        </div>
+    </div>
+
+    <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-slate-400 text-xs mt-auto">
+        &copy; 2026 LEGO Embedded System Guide. All rights reserved. Premium Custom LEGO Theme Framework.
+    </footer>
+
+    <script id="full-main-code" type="text/plain">/**************************************************************************//**
+ * @file     main.c
+ * @version  V1.00
+ * @brief    I2C temperature reading from NCT7712Y + Timer PWM LED breathing.
+ * When temperature > 27 C, the breathing LED is faster.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * @copyright (C) 2024 Nuvoton Technology Corp. All rights reserved.
+ *****************************************************************************/
+#include <stdio.h>
+#include "NuMicro.h"
+#include "Common.h"
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* DMA Descriptor Structure                                                                                */
+/*---------------------------------------------------------------------------------------------------------*/
+typedef struct dma_desc_t
+{
+    uint32_t ctl;
+    uint32_t src;
+    uint32_t dest;
+    uint32_t offset;
+} DMA_DESC_T;
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Macro Definitions                                                                                       */
+/*---------------------------------------------------------------------------------------------------------*/
+/* I2C PDMA channels */
+#define I2C0_PDMA_TX_CH    0
+#define I2C0_PDMA_RX_CH    1
+
+/* I2C scatter-gather parameters */
+#define SG_TX_TAB_NUM      1
+#define SG_RX_TAB_NUM      5
+#define SG_TX_LENGTH       3
+#define SG_RX_LENGTH       2
+#define SG_BASE_ADDR       0x20000000
+
+/* PWM breathing parameters */
+#define PWM_PDMA_LENGTH    7
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Global Variables                                                                                        */
+/*---------------------------------------------------------------------------------------------------------*/
+uint8_t SrcArray[SG_TX_LENGTH * SG_TX_TAB_NUM];
+uint8_t DestArray[SG_RX_LENGTH * SG_RX_TAB_NUM];
+uint32_t SrcArray_PWM[PWM_PDMA_LENGTH];
+
+DMA_DESC_T DMA_DESC_SC_TX[SG_TX_TAB_NUM];
+DMA_DESC_T DMA_DESC_SC_RX[SG_RX_TAB_NUM];
+
+typedef void (*I2C_FUNC)(uint32_t u32Status);
+volatile static I2C_FUNC s_I2C0HandlerFn = NULL;
+
+uint32_t NCT7712Y_Data = 0;
+float NCT7712Y_Data_F = 0;
+volatile uint32_t PDMA_DONE = 0;
+uint8_t g_u8DeviceAddr = 0x48;
+uint32_t PWM_PERIOD_Value;
+
+/* Breathing LED software divider (ISR-driven, no PDMA) */
+volatile uint32_t g_u32PWMIdx = 0;
+volatile uint32_t g_u32BreathDiv = 10;     /* Number of ISR calls per duty step */
+volatile uint32_t g_u32BreathCnt = 0;
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: Build_Tx_SCTab                                                                                */
+/* Purpose : Build scatter-gather descriptor table for I2C0 TX PDMA channel                                */
+/*---------------------------------------------------------------------------------------------------------*/
+void Build_Tx_SCTab(uint32_t u32TabNum, uint32_t u32TxSize, uint32_t u32StartAddr)
+{
+    uint32_t i;
+
+    for (i = 0; i < u32TabNum; i++)
+    {
+        DMA_DESC_SC_TX[i].ctl = PDMA_OP_SCATTER |
+                                PDMA_REQ_SINGLE |
+                                PDMA_DAR_FIX |
+                                PDMA_SAR_INC |
+                                PDMA_WIDTH_8 |
+                                PDMA_TBINTDIS_DISABLE |
+                                ((u32TxSize - 1) << PDMA_DSCT_CTL_TXCNT_Pos);
+        DMA_DESC_SC_TX[i].src    = (uint32_t)(u32StartAddr + i * u32TxSize);
+        DMA_DESC_SC_TX[i].dest   = (uint32_t)&(I2C0->DAT);
+        DMA_DESC_SC_TX[i].offset = (uint32_t)&DMA_DESC_SC_TX[0] - SG_BASE_ADDR;
+    }
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: Build_Rx_SCTab                                                                                */
+/* Purpose : Build scatter-gather descriptor table for I2C0 RX PDMA channel; last entry uses basic mode   */
+/*---------------------------------------------------------------------------------------------------------*/
+void Build_Rx_SCTab(uint32_t u32TabNum, uint32_t u32RxSize, uint32_t u32StartAddr)
+{
+    uint32_t i;
+
+    for (i = 0; i < u32TabNum; i++)
+    {
+        DMA_DESC_SC_RX[i].ctl = PDMA_OP_SCATTER |
+                                PDMA_REQ_SINGLE |
+                                PDMA_SAR_FIX |
+                                PDMA_DAR_INC |
+                                PDMA_WIDTH_8 |
+                                PDMA_TBINTDIS_DISABLE |
+                                ((u32RxSize - 1) << PDMA_DSCT_CTL_TXCNT_Pos);
+        DMA_DESC_SC_RX[i].src    = (uint32_t)&(I2C0->DAT);
+        DMA_DESC_SC_RX[i].dest   = (uint32_t)(u32StartAddr + i * u32RxSize);
+        DMA_DESC_SC_RX[i].offset = (uint32_t)&DMA_DESC_SC_RX[0] + 0x10 * (i + 1) - (PDMA0->SCATBA);
+    }
+
+    /* For the last entry: enable transfer-done interrupt and switch to basic mode */
+    DMA_DESC_SC_RX[u32TabNum - 1].ctl = (DMA_DESC_SC_RX[u32TabNum - 1].ctl & ~(PDMA_DSCT_CTL_TBINTDIS_Msk | PDMA_DSCT_CTL_OPMODE_Msk)) |
+                                        (PDMA_TBINTDIS_ENABLE | PDMA_OP_BASIC);
+    DMA_DESC_SC_RX[u32TabNum - 1].offset = 0;
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* I2C0 IRQ Handler                                                                                        */
+/*---------------------------------------------------------------------------------------------------------*/
+void I2C0_IRQHandler(void)
+{
+    uint32_t u32Status;
+
+    u32Status = I2C_GET_STATUS(I2C0);
+
+    if (I2C_GET_TIMEOUT_FLAG(I2C0))
+    {
+        /* Clear I2C0 timeout flag */
+        I2C_ClearTimeoutFlag(I2C0);
+    }
+    else
+    {
+        if (s_I2C0HandlerFn != NULL)
+            s_I2C0HandlerFn(u32Status);
+    }
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: I2C_PDMA_MasterRx                                                                             */
+/* Purpose : I2C0 PDMA Master Rx callback; handles bus states during auto-operation random read            */
+/*---------------------------------------------------------------------------------------------------------*/
+void I2C_PDMA_MasterRx(uint32_t u32Status)
+{
+    if (u32Status == 0x08)                               /* START has been transmitted */
+    {
+        /* During PDMA operation, I2C will not generate START interrupt */
+    }
+    else if (u32Status == 0x18)                         /* SLA+W ACK */
+    {
+        /* During PDMA operation, I2C will not generate address ACK interrupt */
+    }
+    else if (u32Status == 0x20)                         /* SLA+W NACK */
+    {
+        I2C_STOP(I2C0);
+        I2C_START(I2C0);
+    }
+    else if (u32Status == 0x28)                         /* DATA ACK */
+    {
+        /* During PDMA operation, I2C will not generate data ACK interrupt */
+    }
+    else if (u32Status == 0x10)                         /* Repeat START */
+    {
+    }
+    else if (u32Status == 0x40)                         /* SLA+R ACK */
+    {
+        /* During PDMA operation, I2C will not generate address ACK interrupt */
+    }
+    else if (u32Status == 0x50)                         /* DATA received ACK */
+    {
+        /* During PDMA operation, I2C will not generate receive data ACK interrupt */
+    }
+    else if (u32Status == 0x58)                         /* DATA received NACK */
+    {
+        /* During Auto operation, I2C will not generate receive data NACK interrupt */
+    }
+    else
+    {
+        printf("Status 0x%x is NOT processed\n", u32Status);
+    }
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* PDMA0 IRQ Handler                                                                                       */
+/*---------------------------------------------------------------------------------------------------------*/
+void PDMA0_IRQHandler(void)
+{
+    uint32_t u32Status = PDMA0->TDSTS;
+
+    /* I2C RX channel done */
+    if (u32Status & (0x1 << I2C0_PDMA_RX_CH))
+    {
+        PDMA0->TDSTS = 0x1 << I2C0_PDMA_RX_CH;
+        PDMA_DONE = 1;
+    }
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* TMR0 IRQ Handler — update PWM duty for breathing LED via software divider                               */
+/*---------------------------------------------------------------------------------------------------------*/
+void TMR0_IRQHandler(void)
+{
+    /* Clear wakeup flag (needed when waking from NPD1) */
+    TPWM_ClearWakeupFlag(TIMER0);
+
+    if (TIMER0->PWMAINTSTS & TIMER_PWMAINTSTS_IFAIF_Msk)
+    {
+        /* Clear accumulator interrupt flag */
+        TIMER0->PWMAINTSTS = TIMER_PWMAINTSTS_IFAIF_Msk;
+
+        if (++g_u32BreathCnt >= g_u32BreathDiv)
+        {
+            g_u32BreathCnt = 0;
+            TIMER0->PWMCMPDAT = SrcArray_PWM[g_u32PWMIdx];
+            g_u32PWMIdx = (g_u32PWMIdx + 1) % PWM_PDMA_LENGTH;
+        }
+    }
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: I2C_Init                                                                                      */
+/* Purpose : Open I2C0 at 100kHz and enable I2C0 interrupt                                                 */
+/*---------------------------------------------------------------------------------------------------------*/
+void I2C_Init(void)
+{
+    /* Open I2C0 module and set bus clock to 100kHz */
+    I2C_Open(I2C0, 100000);
+
+    /* Enable I2C0 interrupt */
+    I2C_EnableInt(I2C0);
+    NVIC_EnableIRQ(I2C0_IRQn);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: TIMER_Init                                                                                    */
+/* Purpose : Configure TIMER1 as periodic 1Hz with LIRC for I2C auto-operation trigger                     */
+/*---------------------------------------------------------------------------------------------------------*/
+void TIMER_Init(void)
+{
+    /* Open TIMER1 to periodic mode, 1 Hz */
+    TIMER_Open(TIMER1, TIMER_PERIODIC_MODE, 1);
+
+    /* Enable TIMER1 Power-down engine clock */
+    TIMER1->CTL |= TIMER_CTL_PDCLKEN_Msk;
+
+    /* Set TIMER1 to trigger I2C when timeout */
+    TIMER_SetATriggerSource(TIMER1, TIMER_ATRGSRC_TIMEOUT_EVENT);
+
+    /* Enable TIMER1 to trigger Other Peripheral (IPS) */
+    TIMER_SetATriggerTarget(TIMER1, TIMER_ATRG_TO_IPS);
+
+    /* Disable CPU wake-up by timer */
+    TIMER_DisableWakeup(TIMER1);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: Timer_PWM_Init                                                                                */
+/* Purpose : Configure TIMER0 PWM at 100Hz on PB5, accumulator + PDMA                                     */
+/*---------------------------------------------------------------------------------------------------------*/
+void Timer_PWM_Init(void)
+{
+    /* Switch TIMER0 to PWM mode */
+    TPWM_ENABLE_PWM_MODE(TIMER0);
+
+    /* Enable PWM output on CH0 (PB5) */
+    TPWM_ENABLE_OUTPUT(TIMER0, TPWM_CH0);
+
+    /* Set frequency 100Hz, 0% initial duty */
+    TPWM_ConfigOutputFreqAndDuty(TIMER0, 100, 0);
+
+    /* Read actual period count from register */
+    PWM_PERIOD_Value = TIMER0->PWMPERIOD + 1;
+
+    /* Enable Power-down engine clock */
+    TIMER0->CTL |= TIMER_CTL_PDCLKEN_Msk;
+
+    /* Keep PWM active in debug mode */
+    SYS_UnlockReg();
+    TIMER0->PWMCTL |= TIMER_PWMCTL_DBGTRIOFF_Msk;
+    SYS_LockReg();
+
+    /* Enable accumulator: IFACNT=0 means fire every 1 period (100 ISR/sec at 100Hz PWM) */
+    TPWM_EnableAcc(TIMER0, 0, TPWM_IFA_PERIOD_POINT);
+
+    /* Enable accumulator interrupt (software divider controls breathing speed) */
+    TPWM_EnableAccInt(TIMER0);
+    NVIC_EnableIRQ(TMR0_IRQn);
+
+    /* Enable TPWM interrupt wake-up so TMR0 ISR can wake CPU from NPD1 to update PWMCMPDAT */
+    TPWM_EnableWakeup(TIMER0);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: PDMA_TX_Init                                                                                  */
+/* Purpose : Configure PDMA channel for I2C0 TX in scatter-gather mode                                     */
+/*---------------------------------------------------------------------------------------------------------*/
+void PDMA_TX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
+{
+    PDMA_Open(PDMA0, 1 << u8TestCh);
+
+    /* Setup Scatter-gather table for TX transfer */
+    Build_Tx_SCTab(u32TabNum, u32TestLen, (uint32_t)&SrcArray);
+
+    PDMA_SetTransferMode(PDMA0, u8TestCh, PDMA_I2C0_TX, 1, (uint32_t)&DMA_DESC_SC_TX[0]);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: PDMA_RX_Init                                                                                  */
+/* Purpose : Configure PDMA channel for I2C0 RX in scatter-gather mode; enable transfer-done interrupt   */
+/*---------------------------------------------------------------------------------------------------------*/
+void PDMA_RX_Init(uint8_t u8TestCh, uint32_t u32TabNum, uint32_t u32TestLen)
+{
+    PDMA_Open(PDMA0, 1 << u8TestCh);
+
+    /* Setup Scatter-gather table for RX transfer */
+    Build_Rx_SCTab(u32TabNum, u32TestLen, (uint32_t)&DestArray);
+
+    PDMA_SetTransferMode(PDMA0, u8TestCh, PDMA_I2C0_RX, 1, (uint32_t)&DMA_DESC_SC_RX[0]);
+
+    /* Enable channel transfer done interrupt */
+    PDMA_EnableInt(PDMA0, I2C0_PDMA_RX_CH, PDMA_INT_TRANS_DONE);
+    NVIC_EnableIRQ(PDMA0_IRQn);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: I2C_Trigger_Init                                                                              */
+/* Purpose : Configure I2C0 auto-operation mode, trigger source, and RX/TX byte count                      */
+/*---------------------------------------------------------------------------------------------------------*/
+void I2C_Trigger_Init(uint32_t u32Mode, uint32_t u32Src, uint32_t u32RxCnt, uint32_t u32TxCnt)
+{
+    /* Set Auto-operation Mode */
+    I2C0->AUTOCTL = (I2C0->AUTOCTL & ~I2C_AUTOCTL_AUTOMODE_Msk) | (u32Mode);
+
+    /* Trigger source select */
+    I2C0->AUTOCTL = (I2C0->AUTOCTL & ~I2C_AUTOCTL_TGSRCSEL_Msk) | (u32Src);
+
+    I2C0->AUTOCNT = (I2C0->AUTOCNT & ~(I2C_AUTOCNT_RXCNT_Msk | I2C_AUTOCNT_TXCNT_Msk));
+
+    if (u32RxCnt != 0)
+        I2C0->AUTOCNT |= ((u32RxCnt - 1) << I2C_AUTOCNT_RXCNT_Pos);
+
+    if (u32TxCnt != 0)
+        I2C0->AUTOCNT |= ((u32TxCnt - 1) << I2C_AUTOCNT_TXCNT_Pos);
+
+    I2C0->AUTOCTL |= I2C_AUTOCTL_TRGEN_Msk;
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function: AutoOperation_FunctionTest                                                                    */
+/* Purpose : Main test function: setup PDMA transfers, enter power-down, decode temperature on wakeup     */
+/*---------------------------------------------------------------------------------------------------------*/
+void AutoOperation_FunctionTest(void)
+{
+    uint32_t i;
+    uint8_t *pu8Tmp;
+
+    PDMA_DONE = 0;
+
+    /* Build I2C write frame: SLV+W, register address, SLV+R */
+    pu8Tmp = SrcArray;
+    for (i = 0; i < SG_TX_TAB_NUM; i++)
+    {
+        g_u8DeviceAddr = 0x48;
+        *pu8Tmp++ = ((g_u8DeviceAddr << 1) | 0x00);   /* SLV + W              */
+        *pu8Tmp++ = 0x00;                              /* Register address     */
+        *pu8Tmp++ = ((g_u8DeviceAddr << 1) | 0x01);   /* SLV + R              */
+    }
+
+    /* Set I2C0 interrupt callback for master receive operation */
+    s_I2C0HandlerFn = (I2C_FUNC)I2C_PDMA_MasterRx;
+
+    I2C_SET_CONTROL_REG(I2C0, I2C_CTL_AA);
+
+    /* PDMA CH0 scatter-gather mode to write data to slave */
+    PDMA_TX_Init(I2C0_PDMA_TX_CH, SG_TX_TAB_NUM, SG_TX_LENGTH);
+
+    /* PDMA CH1 scatter-gather mode to receive data from slave */
+    PDMA_RX_Init(I2C0_PDMA_RX_CH, SG_RX_TAB_NUM, SG_RX_LENGTH);
+
+    /* Auto operation random read mode with repeat start, triggered by TIMER1 */
+    I2C_Trigger_Init(I2C_RANDOM_REPEAT_STA, I2C_AUTOCTL_TRIGSEL_TMR1, SG_RX_LENGTH, SG_TX_LENGTH);
+
+    /* Enter NPD1 power-down while waiting for PDMA RX done.
+     * Timer0 (LIRC, PDCLKEN) keeps PWM output running in NPD1.
+     * Timer1 (LIRC, PDCLKEN) triggers I2C auto-operation in NPD1.
+     * CPU wakes on TMR0 accumulator ISR (breathing LED update) or PDMA0 ISR (I2C RX done).
+     * Re-enter NPD1 after TMR0 ISR if PDMA_DONE is still 0. */
+    {
+        uint32_t u32Timeout = 1000; /* ~10 seconds at 100Hz TMR0 wake-up rate */
+
+        SYS_UnlockReg();
+        CLK_SetPowerDownMode(CLK_PMUCTL_PDMSEL_NPD1);
+        CLK->PMUCTL = (CLK->PMUCTL & ~(CLK_PMUCTL_PDLDCSEL_Msk)) | CLK_PMUCTL_PDLDCSEL_ULP;
+
+        while (!PDMA_DONE)
+        {
+            /* Clear all wakeup flags before entering power-down */
+            CLK->PMUSTS |= CLK_PMUSTS_CLRWK_Msk;
+
+            /* Ensure UART TX is fully flushed before stopping HIRC in NPD1,
+             * otherwise a byte in mid-transmission gets corrupted. */
+            UART_WAIT_TX_EMPTY(UART0);
+
+            CLK_PowerDown();    /* CPU enters NPD1 here until next interrupt */
+
+            if (u32Timeout-- == 0)
+            {
+                printf("PDMA timeout error!\n");
+                SYS_LockReg();
+                return;
+            }
+        }
+
+        SYS_LockReg();
+    }
+
+    printf("Wakeup\n");
+
+    printf("I2C0 Rx done\n");
+
+    /* Decode raw temperature data from NCT7712Y (12-bit, 0.0625 C/LSB) and print result */
+    for (i = 0; i < SG_RX_TAB_NUM * 2; i += 2)
+    {
+        NCT7712Y_Data  = DestArray[i];
+        NCT7712Y_Data <<= 8;
+        NCT7712Y_Data |= DestArray[i + 1];
+
+        NCT7712Y_Data >>= 4;                           /* bit0 ~ bit3 are reserved */
+
+        /* Determine if the temperature is positive or negative */
+        if (NCT7712Y_Data & 0x800)
+        {
+            /* Get NCT7712Y_Data 2's complement */
+            NCT7712Y_Data = ~NCT7712Y_Data & 0x00000FFF;
+            NCT7712Y_Data += 1;
+
+            /* Get negative Celsius temperature value */
+            NCT7712Y_Data_F = (float)(NCT7712Y_Data * -0.0625f);
+        }
+        else
+        {
+            /* Get positive Celsius temperature value */
+            NCT7712Y_Data_F = (float)(NCT7712Y_Data * 0.0625f);
+        }
+
+        printf("Current Temperature = %.4f degrees Celsius.\n", NCT7712Y_Data_F);
+    }
+
+    /* Adjust breathing speed via software divider (no IFACNT change, no stop/start needed) */
+    if (NCT7712Y_Data_F > 27.0f)
+    {
+        g_u32BreathDiv = 5;    /* Fast: duty changes every 5 periods = 50ms, full cycle = 350ms */
+        printf("Fast breathing\n");
+    }
+    else
+    {
+        g_u32BreathDiv = 60;   /* Slow: duty changes every 60 periods = 600ms, full cycle = 4.2s */
+        printf("Slow breathing\n");
+    }
+
+    printf("\n");
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Previously generated: SYS_Init                                                                          */
+/*---------------------------------------------------------------------------------------------------------*/
+void SYS_Init(void)
+{
+    /* Unlock protected registers */
+    SYS_UnlockReg();
+
+    /* Enable HIRC and LIRC clock sources */
+    CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk | CLK_PWRCTL_LIRCEN_Msk);
+
+    /* Wait for HIRC and LIRC clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
+    CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
+
+    /* Set HCLK clock source to HIRC with divider 1 */
+    CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_HIRC, CLK_HCLKDIV_HCLK(1));
+
+    /* Set PCLK0/PCLK1 to HCLK/2 */
+    CLK->PCLKDIV = (CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2);
+
+    /* Update System Core Clock */
+    SystemCoreClockUpdate();
+
+    /* Select UART0 clock source as HIRC with divider 1 */
+    CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL2_UART0SEL_HIRC, CLK_CLKDIV_UART0(1));
+
+    /* Select TIMER0 clock source as LIRC (for PWM breathing LED, keeps running in power-down) */
+    CLK_SetModuleClock(TMR0_MODULE, CLK_CLKSEL1_TMR0SEL_LIRC, MODULE_NoMsk);
+
+    /* Select TIMER1 clock source as LIRC (for I2C auto-operation trigger, keeps running in power-down) */
+    CLK_SetModuleClock(TMR1_MODULE, CLK_CLKSEL1_TMR1SEL_LIRC, MODULE_NoMsk);
+
+    /* Enable peripheral clocks */
+    CLK_EnableModuleClock(UART0_MODULE);
+    CLK_EnableModuleClock(I2C0_MODULE);
+    CLK_EnableModuleClock(TMR0_MODULE);
+    CLK_EnableModuleClock(TMR1_MODULE);
+    CLK_EnableModuleClock(PDMA0_MODULE);
+    CLK_EnableModuleClock(GPA_MODULE);
+    CLK_EnableModuleClock(GPB_MODULE);
+    CLK_EnableModuleClock(GPC_MODULE);
+
+    /*---------------------------------------------------------------------------------------------------------*/
+    /* Init Multi-Function Pins                                                                                */
+    /*---------------------------------------------------------------------------------------------------------*/
+
+    /* Set PB13 as UART0_TXD (TX only, no RX pin to avoid leakage in power-down) */
+    SYS->GPB_MFPH = (SYS->GPB_MFPH & ~SYS_GPB_MFPH_PB13MFP_Msk) | SYS_GPB_MFPH_PB13MFP_UART0_TXD;
+
+    /* Set PC0 as I2C0_SDA, PC1 as I2C0_SCL */
+    SYS->GPC_MFPL = (SYS->GPC_MFPL & ~(SYS_GPC_MFPL_PC0MFP_Msk | SYS_GPC_MFPL_PC1MFP_Msk)) |
+                     (SYS_GPC_MFPL_PC0MFP_I2C0_SDA | SYS_GPC_MFPL_PC1MFP_I2C0_SCL);
+
+    /* Enable Schmitt trigger on PC0 and PC1 for I2C noise immunity */
+    PC->SMTEN |= (GPIO_SMTEN_SMTEN0_Msk | GPIO_SMTEN_SMTEN1_Msk);
+
+    /* Set PB5 as TM0 PWM output for LED breathing effect */
+    SYS->GPB_MFPL = (SYS->GPB_MFPL & ~SYS_GPB_MFPL_PB5MFP_Msk) | SYS_GPB_MFPL_PB5MFP_TM0;
+
+    /* Lock protected registers */
+    SYS_LockReg();
+}
+
+/*----------------------------------------------------------------------*/
+/* Init UART0                                                           */
+/*----------------------------------------------------------------------*/
+void UART0_Init(void)
+{
+    /* Reset UART0 */
+    SYS_ResetModule(UART0_RST);
+
+    /* Configure UART0 and set UART0 baud rate */
+    UART_Open(UART0, 115200);
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* main                                                                                                    */
+/*---------------------------------------------------------------------------------------------------------*/
+int32_t main(void)
+{
+    /* Unlock protected registers */
+    SYS_UnlockReg();
+
+    /* Initialize system with minimum current consumption */
+    Min_Current_Init();
+
+    /* Init System, IP clock and multi-function I/O */
+    SYS_Init();
+
+    /* Init UART0 for printf */
+    UART0_Init();
+
+    /* Init I2C0 */
+    I2C_Init();
+
+    /* Init TIMER1 for I2C auto-operation trigger */
+    TIMER_Init();
+    TIMER_Start(TIMER1);
+
+    /* Init TIMER0 for PWM breathing */
+    Timer_PWM_Init();
+
+    /* Build PWM breathing duty table: 20%->40%->80%->100%->80%->40%->20% of PWM period */
+    SrcArray_PWM[0] = PWM_PERIOD_Value * 20 / 100;
+    SrcArray_PWM[1] = PWM_PERIOD_Value * 40 / 100;
+    SrcArray_PWM[2] = PWM_PERIOD_Value * 80 / 100;
+    SrcArray_PWM[3] = PWM_PERIOD_Value * 100 / 100;
+    SrcArray_PWM[4] = PWM_PERIOD_Value * 80 / 100;
+    SrcArray_PWM[5] = PWM_PERIOD_Value * 40 / 100;
+    SrcArray_PWM[6] = PWM_PERIOD_Value * 20 / 100;
+
+    /* Start Timer0 PWM */
+    TPWM_START_COUNTER(TIMER0);
+
+    /* Print description message */
+    printf("+-------------------------------------------------------------+\n");
+    printf("| M2U51 I2C + Timer PWM Breathing LED Sample Code             |\n");
+    printf("|                                                             |\n");
+    printf("| I2C Master (I2C0) <---> NCT7712Y Temperature Sensor          |\n");
+    printf("| Timer0 PWM breathing on PB5, speed adjusts by temperature   |\n");
+    printf("+-------------------------------------------------------------+\n\n");
+    UART_WAIT_TX_EMPTY(UART0);
+
+    /* Main loop */
+    while (1)
+    {
+        AutoOperation_FunctionTest();
+    }
+}</script>
+
+    <script>
+        let currentStep = 0;
+        const totalSteps = 6; // 0, 1, 2, 3, 4, 5
+        let temperatureValue = 25.0;
+        let isCastleRunning = false;
+        let isCodeCollapsed = false;
+
+        // Assembly interactive text strings
+        const legoAssemblyLegends = {
+            0: "[概要ブロック] 設計フェーズ。現在、ハードウェアモジュールは構築されていません。このワークスペースは、M2U51 MCU によって駆動される高応答ファクトリーをシミュレートします。ベースコア構造、ローカルデバッグループ、点滅アラームインジケータ、および自動 I2C DMA 経路を組み立てます。「次へ」をクリックしてコアクロックを設定します。",
+            1: "[コアファクトリーベース & クロック構築完了] コアプラットフォームの準備が整いました。システム HIRC (48MHz) がメインパイプラインを実行します。低消費電力の LIRC (38.4kHz) は、スリープ中もバックグラウンドタイマーをアクティブに保ち、低消費電力機能を保証します。PC0/PC1 および PB5 のポートマッピングがアクティブです。次に、デバッグ診断モジュールを組み立てます。",
+            2: "[診断インターフェース接続完了] 診断システムがオンラインになりました。PB13 に TX ポートをマッピングしました。これにより、システムは printf() 文を使用してデバッグ通知をプッシュできます。ピンのフローティングによるリークを防ぐため、RX パスは隔離されたままです。次に、警告 LED インジケータを取り付けます。",
+            3: "[システム呼吸 LED 実装完了] Timer0 PWM コントローラが接続されました。ハードウェアアキュムレータが 10ms ごとにスムーズに状態変化をトリガーします。ソフトウェアのしきい値に達すると、デューティサイクルレジスタを直接更新して、スムーズなパルスフェードを出力します。次に、センサーデータの経路を接続します。",
+            4: "[コンベアベルト & 温度センサーリンク完了] I2C インターフェースが NCT7712Y 温度センサーにリンクされました。Timer1 が定期的にバックグラウンド読み取りをトリガーします。TX 記述子は自動的にループし、RX 記述子はすべての 10 バイトがプルされると停止して CPU に割り込みをかけます。最後に、M2U51 コントローラを接続します。",
+            5: "[M2U51 MCU コントローラ構築完了] コントローラがオンラインになりました。システムは NPD1 ディープパワーダウンモード内でスリープします。10ms のクロックが CPU を短時間ウェイクアップして LED をパルス駆動し、1 秒のタイムアウトが CPU をウェイクアップしてセンサー値をパースおよび表示します。HMI スライダーを使って目標温度を調整し、「キャッスルクローズドループ開始」をクリックして動作をテストしてください！"
+        };
+
+        window.onload = function() {
+            initFullCode();
+            goToStep(0);
+        }
+
+        // Initialize display with code text and lines numbers
+        function initFullCode() {
+            const rawCode = document.getElementById('full-main-code').textContent;
+            const lines = rawCode.split('\n');
+            
+            const lineNumbersBox = document.getElementById('line-numbers');
+            lineNumbersBox.innerHTML = lines.map((_, idx) => `<div>${idx + 1}</div>`).join('');
+            
+            const fullCodeBox = document.getElementById('full-code-content');
+            fullCodeBox.textContent = rawCode;
+        }
+
+        // Navigation step handling
+        function goToStep(step) {
+            // Update active content panels
+            for (let i = 0; i < totalSteps; i++) {
+                const content = document.getElementById(`step-content-${i}`);
+                if (content) {
+                    if (i === step) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                }
+
+                // Update wizard progress indicators
+                const stepNum = document.getElementById(`step-num-${i}`);
+                const stepTxt = document.getElementById(`step-txt-${i}`);
+                if (stepNum) {
+                    if (i < step) {
+                        stepNum.className = "w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all";
+                        stepNum.innerHTML = '<i class="fa-solid fa-check text-xs"></i>';
+                        if (stepTxt) stepTxt.className = "text-[10px] mt-1 font-semibold text-emerald-600 block";
+                    } else if (i === step) {
+                        stepNum.className = "w-9 h-9 rounded-full bg-pulseRed text-white flex items-center justify-center font-bold text-sm border-4 border-white transition-all shadow-lg shadow-red-500/30 scale-110";
+                        stepNum.innerHTML = step;
+                        if (stepTxt) stepTxt.className = "text-[10px] mt-1 font-semibold text-pulseRed block";
+                    } else {
+                        stepNum.className = "w-9 h-9 rounded-full bg-[#F4F5F7] text-slate-400 flex items-center justify-center font-bold text-sm border-4 border-slate-200 transition-all";
+                        stepNum.innerHTML = i;
+                        if (stepTxt) stepTxt.className = "text-[10px] mt-1 font-semibold text-slate-500 block";
+                    }
+                }
+            }
+
+            // Code viewer accordion is only visible on step 5
+            const codeWindow = document.getElementById('code-window-container');
+            if (step === 5) {
+                codeWindow.classList.remove('hidden');
+            } else {
+                codeWindow.classList.add('hidden');
+            }
+
+            updateLegoBlueprint(step);
+
+            currentStep = step;
+            updateFooterButtons();
+        }
+
+        // Handle SVG visual changes based on active steps
+        function updateLegoBlueprint(step) {
+            const parts = {
+                1: 'lego-plate',
+                2: 'lego-uart',
+                3: 'lego-wheel',
+                4: 'lego-conveyor',
+                5: 'lego-brain'
+            };
+
+            for (let i = 1; i <= 5; i++) {
+                const element = document.getElementById(parts[i]);
+                if (element) {
+                    if (i <= step) {
+                        element.classList.remove('lego-locked');
+                        element.classList.add('lego-unlocked');
+                    } else {
+                        element.classList.remove('lego-unlocked');
+                        element.classList.add('lego-locked');
+                    }
+                }
+            }
+
+            // Update header badges
+            const progressValue = step;
+            document.getElementById('progress-percent-badge').innerText = `${progressValue * 20}%`;
+            document.getElementById('progress-bar-badge').style.width = `${progressValue * 20}%`;
+            document.getElementById('unlocked-count').innerText = progressValue;
+
+            // Update preview descriptions
+            const legendDesc = document.getElementById('assembly-desc');
+            legendDesc.innerText = legoAssemblyLegends[step];
+
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
+
+            if (step === 5) {
+                statusDot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                statusTxt.innerText = "準備完了 (待機中)";
+                statusTxt.className = "font-bold text-amber-500";
+                
+                // Unlock slide HMI interface controls
+                document.getElementById('lego-temp-slider').removeAttribute('disabled');
+                document.getElementById('lego-temp-slider').className = "w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#D7262F]";
+                document.getElementById('btn-final-action').removeAttribute('disabled');
+                document.getElementById('btn-final-action').className = "w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10";
+                document.getElementById('btn-final-action').innerText = "キャッスルクローズドループ開始";
+                document.getElementById('cycle-trigger-tip').classList.remove('hidden');
+            } else {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+                statusTxt.innerText = step === 0 ? "設計中" : "組み立て中";
+                statusTxt.className = "font-bold text-slate-500";
+
+                // Lock slide HMI controls
+                document.getElementById('lego-temp-slider').setAttribute('disabled', 'true');
+                document.getElementById('lego-temp-slider').className = "w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-not-allowed accent-slate-400";
+                document.getElementById('btn-final-action').setAttribute('disabled', 'true');
+                document.getElementById('btn-final-action').className = "w-full py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs cursor-not-allowed shadow-inner";
+                document.getElementById('btn-final-action').innerHTML = '<i class="fa-solid fa-play"></i> コントローラ無効';
+                document.getElementById('cycle-trigger-tip').classList.add('hidden');
+                
+                stopCastleAnimation();
+            }
+        }
+
+        // Bottom control buttons logic
+        function updateFooterButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const progressLine = document.getElementById('step-progress-line');
+
+            if (currentStep === 0) {
+                prevBtn.setAttribute('disabled', 'true');
+            } else {
+                prevBtn.removeAttribute('disabled');
+            }
+
+            if (currentStep === totalSteps - 1) { // 5
+                nextBtn.innerHTML = '構築完了 <i class="fa-solid fa-award text-yellow-300"></i>';
+                nextBtn.className = "px-6 py-2 rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-500/10 text-sm font-semibold flex items-center gap-2 transition-all";
+            } else {
+                nextBtn.innerHTML = '次へ <i class="fa-solid fa-arrow-right"></i>';
+                nextBtn.className = "px-6 py-2 rounded-xl text-white bg-[#D7262F] hover:bg-red-700 shadow-lg shadow-red-500/10 text-sm font-semibold flex items-center gap-2 transition-all";
+            }
+
+            const progressPercent = (currentStep / (totalSteps - 1)) * 100;
+            progressLine.style.width = `${progressPercent}%`;
+        }
+
+        function changeStep(direction) {
+            let targetStep = currentStep + direction;
+            if (targetStep >= 0 && targetStep < totalSteps) {
+                goToStep(targetStep);
+            } else if (targetStep >= totalSteps) {
+                showCelebration();
+            }
+        }
+
+        // Accordion visibility collapse handler
+        function toggleCodeCollapse() {
+            const body = document.getElementById('code-window-body');
+            const icon = document.getElementById('code-collapse-icon');
+            const statusText = document.getElementById('code-collapse-status');
+
+            isCodeCollapsed = !isCodeCollapsed;
+            if (isCodeCollapsed) {
+                body.style.maxHeight = '0px';
+                body.style.opacity = '0';
+                icon.style.transform = 'rotate(-90deg)';
+                statusText.innerText = '折りたたみ中 (クリックで展開)';
+            } else {
+                body.style.maxHeight = '1000px';
+                body.style.opacity = '1';
+                icon.style.transform = 'rotate(0deg)';
+                statusText.innerText = 'クリックで切り替え';
+            }
+        }
+
+        // Interactive keyword filter in the C source box
+        function searchInCode() {
+            const query = document.getElementById('code-search-input').value.toLowerCase();
+            const rawCode = document.getElementById('full-main-code').textContent;
+            const fullCodeBox = document.getElementById('full-code-content');
+
+            if (!query) {
+                fullCodeBox.textContent = rawCode;
+                return;
+            }
+
+            const lines = rawCode.split('\n');
+            const highlightedLines = lines.map(line => {
+                if (line.toLowerCase().includes(query)) {
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    return line.replace(regex, `<span class="bg-amber-500/40 text-white font-bold">$1</span>`);
+                }
+                return line;
+            });
+
+            fullCodeBox.innerHTML = highlightedLines.join('\n');
+        }
+
+        // Thermometer HMI change updates
+        function updateLegoTemp(val) {
+            temperatureValue = parseFloat(val).toFixed(1);
+            document.getElementById('temp-display-right').innerText = `${temperatureValue} °C`;
+
+            // Adjust temperature bar
+            const mercury = document.getElementById('thermometer-mercury');
+            if (mercury) {
+                const percent = (val - 15) / (40 - 15);
+                const newHeight = 4 + (percent * 22); 
+                const newY = 54 - newHeight; 
+                mercury.setAttribute('height', newHeight);
+                mercury.setAttribute('y', newY);
+            }
+
+            if (isCastleRunning) {
+                adjustLegoCastleSpeed();
+            }
+        }
+
+        // Active/Standby running state controller
+        function triggerLegoCastle() {
+            const btn = document.getElementById('btn-final-action');
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
+
+            if (!isCastleRunning) {
+                isCastleRunning = true;
+                btn.innerHTML = '<i class="fa-solid fa-stop"></i> システム停止';
+                btn.className = "w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md";
+                
+                statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                statusTxt.innerText = "キャッスル動作中";
+                statusTxt.className = "font-bold text-emerald-500";
+
+                startCastleAnimation();
+            } else {
+                stopCastleAnimation();
+            }
+        }
+
+        // Turn on preview loops
+        function startCastleAnimation() {
+            const cargo = document.getElementById('conveyor-cargo');
+            const brain = document.getElementById('lego-brain');
+
+            if (cargo) cargo.classList.add('animate-cargo');
+            if (brain) brain.classList.add('animate-brain');
+
+            adjustLegoCastleSpeed();
+        }
+
+        // Modify running rate depending on value
+        function adjustLegoCastleSpeed() {
+            const legendDesc = document.getElementById('assembly-desc');
+            const sirenRays = document.getElementById('siren-rays');
+            const sirenDome = document.getElementById('siren-dome-breathing');
+
+            if (temperatureValue > 27.0) {
+                if (sirenRays) {
+                    sirenRays.style.animationDuration = '0.5s';
+                    sirenRays.setAttribute('stroke', '#D7262F');
+                }
+                if (sirenDome) {
+                    sirenDome.setAttribute('fill', '#EF4444');
+                }
+                legendDesc.innerHTML = `【アラーム警告: ${temperatureValue}°C > 27°C】<br><span class="text-rose-600 font-bold">過熱を検出しました！</span> スリープモードは解除され、呼吸速度が向上します (g_u32BreathDiv = 5) !`;
+            } else {
+                if (sirenRays) {
+                    sirenRays.style.animationDuration = '2s';
+                    sirenRays.setAttribute('stroke', '#F59E0B');
+                }
+                if (sirenDome) {
+                    sirenDome.setAttribute('fill', '#D7262F');
+                }
+                legendDesc.innerHTML = `【安定動作中: ${temperatureValue}°C】<br>正常な温度です。NPD1 モードでスリープ中。穏やかな呼吸速度です (g_u32BreathDiv = 60)。`;
+            }
+        }
+
+        // Turn off preview loops
+        function stopCastleAnimation() {
+            isCastleRunning = false;
+            const btn = document.getElementById('btn-final-action');
+            if (btn) {
+                btn.className = "w-full py-2.5 rounded-xl bg-pulseRed hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10";
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> キャッスルクローズドループ開始';
+            }
+
+            const statusDot = document.getElementById('lego-status-dot');
+            const statusTxt = document.getElementById('lego-status-txt');
+            if (statusDot && statusTxt) {
+                statusDot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+                statusTxt.innerText = "準備完了 (待機中)";
+                statusTxt.className = "font-bold text-amber-500";
+            }
+
+            const cargo = document.getElementById('conveyor-cargo');
+            const brain = document.getElementById('lego-brain');
+            const sirenRays = document.getElementById('siren-rays');
+            const sirenDome = document.getElementById('siren-dome-breathing');
+
+            if (cargo) cargo.classList.remove('animate-cargo');
+            if (brain) brain.classList.remove('animate-brain');
+            if (sirenRays) {
+                sirenRays.style.animationDuration = '2s';
+                sirenRays.setAttribute('stroke', '#D7262F');
+            }
+            if (sirenDome) {
+                sirenDome.setAttribute('fill', '#D7262F');
+            }
+
+            const legendDesc = document.getElementById('assembly-desc');
+            if (legendDesc) {
+                legendDesc.innerText = legoAssemblyLegends[5];
+            }
+        }
+
+        // Clipboard copy utility using legacy execCommand compatibility standard inside sandbox
+        function copyCode(elementId) {
+            const codeText = document.getElementById(elementId).innerText;
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = codeText;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+        }
+
+        // Modals control logic
+        function showCelebration() {
+            const modal = document.getElementById('celebrate-modal');
+            const box = document.getElementById('celebrate-box');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            box.classList.remove('scale-95');
+            box.classList.add('scale-100');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('celebrate-modal');
+            const box = document.getElementById('celebrate-box');
+            
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            box.classList.add('scale-95');
+            box.classList.remove('scale-100');
+        }
+    </script>
+</body>
+</html>
